@@ -1,0 +1,13 @@
+doc/_build/
+.ipynb_checkpoints/
+.kdev4/
+*.pkl
+*.png
+*.mrv
+*.mol
+*.pyc
+.spyderproject
+branch_info.txt
+commit_msg.txt
+snippets.txt
+tags
