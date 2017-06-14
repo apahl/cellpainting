@@ -27,7 +27,9 @@ im.save(outfile, "JPEG")
 """
 
 import time
+import glob
 import os.path as op
+import xml.etree.ElementTree as ET
 
 import pandas as pd
 import numpy as np
@@ -121,6 +123,7 @@ class DataSet():
     def join_layout_384(self, layout_fn, on="Address"):
         result = DataSet()
         result.data = join_layout_384(self.data, layout_fn, on=on)
+        print("join layout 384:", result.shape)
         return result
 
 
@@ -132,6 +135,7 @@ class DataSet():
         can be used directly to join the layout to the individual 384er plates."""
         result = DataSet()
         result.data = join_layout_1536(self.data, layout_fn, plate, on=on)
+        print("join layout 1536:", result.shape)
         return result
 
 
@@ -146,6 +150,7 @@ class DataSet():
         result = DataSet()
         toxic = DataSet()
         result.data, toxic.data = remove_toxic(self.data, cutoff=cutoff)
+        print("remove toxic:", result.shape)
         return result, toxic
 
 
@@ -153,6 +158,7 @@ class DataSet():
         """Remove entries with `Pure_Flag == "Fail"`"""
         result = DataSet()
         result.data = remove_flagged(self.data)
+        print("remove flagged:s", result.shape)
         return result
 
 
@@ -163,13 +169,26 @@ class DataSet():
         outliers = DataSet()
         result.data, outliers.data = remove_outliers(self.data, times_dev=times_dev,
                                                      group_by=group_by, method=method)
+        print("remove outliers:", result.shape)
         return result, outliers
+
+
+    def remove_skipped_echo_direct_transfer(self, fn):
+        """Remove wells that were reported as skipped in the Echo protocol (xml).
+        This functions works with Echo direct transfer protocols.
+        Function supports using wildcards in the filename, the first file will be used.
+        Returns a new dataframe without the skipped wells."""
+        result = DataSet()
+        result.data = remove_skipped_echo_direct_transfer(self.data, fn=fn)
+        print("remove skipped:", result.shape)
+        return result
 
 
     def group_on_well(self, group_by=FINAL_PARAMETERS):
         """Group results on well level."""
         result = DataSet()
         result.data = group_on_well(self.data, group_by=group_by)
+        print("group on well:", result.shape)
         return result
 
 
@@ -197,6 +216,7 @@ class DataSet():
         result = DataSet()
         result.data = activity_profile(self.data, mad_mult=mad_mult, parameters=parameters,
                                        only_final=only_final)
+        print("activity profile:", result.shape)
         return result
 
 
@@ -204,6 +224,7 @@ class DataSet():
         result = DataSet()
         result.data = relevant_parameters(self.data, ctrls_mad_min=ctrls_mad_min, ctrls_mad_max=ctrls_mad_max,
                                           times_mad=times_mad)
+        print("relevant parameters:", result.shape)
         return result
 
 
@@ -219,6 +240,7 @@ class DataSet():
         Returns a new DataFrame with only the non-correlated columns"""
         result = DataSet()
         result.data = correlation_filter(self.data, cutoff=cutoff, method=method)
+        print("correlation filter:", result.shape)
         return result
 
 
@@ -227,6 +249,7 @@ class DataSet():
         `cutoff` gives the similarity threshold, default is 0.9."""
         result = DataSet()
         result.data = find_similar(self.data, act_profile=act_profile, cutoff=cutoff)
+        print("find similar:", result.shape)
         return result
 
 
@@ -317,6 +340,25 @@ def remove_toxic(df, cutoff=0.55):
     toxic = df[df["Count_Cells"] < median_cell_count_controls * cutoff]
 
     return result, toxic
+
+
+def remove_skipped_echo_direct_transfer(df, fn):
+    """Remove wells that were reported as skipped in the Echo protocol (xml).
+    This functions works with Echo direct transfer protocols.
+    Function supports using wildcards in the filename, the first file will be used.
+    Returns a new dataframe without the skipped wells."""
+    assert fn.endswith(".xml"), "Echo file expected in XML format."
+    skipped_wells = []
+    echo_fn = glob.glob(fn)[0]  # use the first glob match
+    echo_print = ET.parse(echo_fn).getroot()
+    skipped = echo_print.find("skippedwells")
+    for well in skipped.findall("w"):
+        skipped_wells.append(cpt.format_well(well.get("n")))
+    print("Skipped wells (will be removed):", skipped_wells)
+    # remove the rows with the skipped wells
+    #   i.e. keep the rows where Metadata_Well is not in the list skipped_wells
+    result = df[~df["Metadata_Well"].isin(skipped_wells)]
+    return result
 
 
 def remove_flagged(df, strict=False, reset_index=True):

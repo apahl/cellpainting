@@ -46,7 +46,6 @@ def format_well(well):
             row.append(c.upper())
             continue
         row_str = "".join(row)
-        print(row_str)
         assert row_str in ROWS, "row {} is not a valid row.".format(row_str)
         column.append(c)
     if len(column) < 2:
