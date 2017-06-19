@@ -66,10 +66,6 @@ class DataSet():
         self.log = log
 
 
-    def xxx_repr_html_(self):
-        return self.data._repr_html_()
-
-
     def _repr_html_(self):
         parameters = [k for k in FINAL_PARAMETERS if k in self.data]
         print("Shape:     ", self.shape)
@@ -77,10 +73,19 @@ class DataSet():
         return self.data[parameters]._repr_html_()
 
 
+    def print_log(self, component, add_info=""):
+        if self.log:
+            component = component + ":"
+            if len(add_info) > 0:
+                add_info = "    ({})".format(add_info)
+            print("{:25s} ({:4d} | {:4d}){}".format(component, self.shape[0], self.shape[1], add_info))
+
+
     def load(self, fn):
         """Read one or multiple result files and concatenate them into one dataset.
         `fn` is a single filename (string) or a list of filenames."""
         self.data = load(fn).data
+        self.print_log("load data")
 
 
     def describe(self, times_mad=3.0):
@@ -124,8 +129,7 @@ class DataSet():
     def join_layout_384(self, layout_fn, on="Address"):
         result = DataSet(log=self.log)
         result.data = join_layout_384(self.data, layout_fn, on=on)
-        if self.log:
-            print("join layout 384:    ", result.shape)
+        result.print_log("join layout 384")
         return result
 
 
@@ -137,8 +141,7 @@ class DataSet():
         can be used directly to join the layout to the individual 384er plates."""
         result = DataSet(log=self.log)
         result.data = join_layout_1536(self.data, layout_fn, plate, on=on)
-        if self.log:
-            print("join layout 1536:   ", result.shape)
+        result.print_log("join layout 1536")
         return result
 
 
@@ -153,17 +156,16 @@ class DataSet():
         result = DataSet()
         toxic = DataSet()
         result.data, toxic.data = remove_toxic(self.data, cutoff=cutoff)
-        if self.log:
-            print("remove toxic:       ", result.shape)
+        result.print_log("remove toxic", "{:3d} removed".format(toxic.shape[0]))
         return result, toxic
 
 
     def remove_flagged(self):
         """Remove entries with `Pure_Flag == "Fail"`"""
         result = DataSet()
-        result.data = remove_flagged(self.data)
-        if self.log:
-            print("remove flagged:     ", result.shape)
+        flagged = DataSet()
+        result.data, flagged.data = remove_flagged(self.data)
+        result.print_log("remove flagged", "{:3d} removed".format(flagged.shape[0]))
         return result
 
 
@@ -174,8 +176,7 @@ class DataSet():
         outliers = DataSet()
         result.data, outliers.data = remove_outliers(self.data, times_dev=times_dev,
                                                      group_by=group_by, method=method)
-        if self.log:
-            print("remove outliers:    ", result.shape)
+        result.print_log("remove outliers", "{:3d} removed".format(outliers.shape[0]))
         return result, outliers
 
 
@@ -185,9 +186,10 @@ class DataSet():
         Function supports using wildcards in the filename, the first file will be used.
         Returns a new dataframe without the skipped wells."""
         result = DataSet()
-        result.data = remove_skipped_echo_direct_transfer(self.data, fn=fn)
-        if self.log:
-            print("remove skipped:     ", result.shape)
+        result.data, skipped = remove_skipped_echo_direct_transfer(self.data, fn=fn)
+        skipped_str = "(" + ", ".join(skipped) + ")"
+        result.print_log("remove skipped", "{:3d} skipped {}".format(self.shape[0] - result.shape[0],
+                                                                     skipped_str))
         return result
 
 
@@ -195,8 +197,7 @@ class DataSet():
         """Group results on well level."""
         result = DataSet()
         result.data = group_on_well(self.data, group_by=group_by)
-        if self.log:
-            print("group on well:      ", result.shape)
+        result.print_log("group on well")
         return result
 
 
@@ -208,8 +209,7 @@ class DataSet():
             e.g. the column with plate name."""
         result = DataSet()
         result.data = poc(self.data, group_by=group_by)
-        if self.log:
-            print("POC:                ", result.shape)
+        self.print_log("POC")
         return result
 
 
@@ -226,8 +226,7 @@ class DataSet():
         result = DataSet()
         result.data = activity_profile(self.data, mad_mult=mad_mult, parameters=parameters,
                                        only_final=only_final)
-        if self.log:
-            print("activity profile:   ", result.shape)
+        result.print_log("activity profile")
         return result
 
 
@@ -235,8 +234,7 @@ class DataSet():
         result = DataSet()
         result.data = relevant_parameters(self.data, ctrls_mad_min=ctrls_mad_min, ctrls_mad_max=ctrls_mad_max,
                                           times_mad=times_mad)
-        if self.log:
-            print("relevant parameters:", result.shape)
+        result.print_log("relevant parameters")
         return result
 
 
@@ -251,9 +249,8 @@ class DataSet():
 
         Returns a new DataFrame with only the non-correlated columns"""
         result = DataSet()
-        result.data = correlation_filter(self.data, cutoff=cutoff, method=method)
-        if self.log:
-            print("correlation filter: ", result.shape)
+        result.data, iterations = correlation_filter(self.data, cutoff=cutoff, method=method)
+        result.print_log("correlation filter", "{:3d} iterations".format(iterations))
         return result
 
 
@@ -262,8 +259,7 @@ class DataSet():
         `cutoff` gives the similarity threshold, default is 0.9."""
         result = DataSet()
         result.data = find_similar(self.data, act_profile=act_profile, cutoff=cutoff)
-        if self.log:
-            print("find similar:       ", result.shape)
+        result.print_log("find similar")
         return result
 
 
@@ -283,8 +279,7 @@ def load(fn):
 
     drop = [d for d in DROP_GLOBAL if d in result.data.keys()]
     result.data.drop(drop, axis=1, inplace=True)
-    if result.log:
-        print("load dataset:           ", result.shape)
+    result.print_log("load dataset")
     return result
 
 
@@ -354,7 +349,6 @@ def remove_toxic(df, cutoff=0.55):
     median_cell_count_controls = df[df["WellType"] == "Control"]["Count_Cells"].median()
     result = df[df["Count_Cells"] >= median_cell_count_controls * cutoff]
     toxic = df[df["Count_Cells"] < median_cell_count_controls * cutoff]
-
     return result, toxic
 
 
@@ -370,11 +364,11 @@ def remove_skipped_echo_direct_transfer(df, fn):
     skipped = echo_print.find("skippedwells")
     for well in skipped.findall("w"):
         skipped_wells.append(cpt.format_well(well.get("dn")))
-    print("Skipped wells (will be removed):", skipped_wells)
+    # print("Skipped wells (will be removed):", skipped_wells)
     # remove the rows with the skipped wells
     #   i.e. keep the rows where Metadata_Well is not in the list skipped_wells
     result = df[~df["Metadata_Well"].isin(skipped_wells)]
-    return result
+    return result, skipped_wells
 
 
 def remove_flagged(df, strict=False, reset_index=True):
@@ -598,8 +592,8 @@ def correlation_filter(df, cutoff=0.9, method="pearson"):
 
     parameters_uncorr.extend(df_copy.keys())
     parameters_uncorr = list(set(parameters_uncorr))
-    print("It took {} iterations to remove all correlated parameters.".format(iteration - 1))
-    return df[parameters_uncorr]
+    # print("It took {} iterations to remove all correlated parameters.".format(iteration - 1))
+    return df[parameters_uncorr], iteration
 
 
 def find_similar(df, act_profile, cutoff=0.9):
