@@ -59,10 +59,11 @@ DROP_GLOBAL = ["PathName_CellOutlines", "URL_CellOutlines", 'FileName_CellOutlin
 
 
 class DataSet():
-    def __init__(self):
+    def __init__(self, log=True):
         self.data = pd.DataFrame()
         self.fields = {"plateColumn": "Metadata_Plate",
                        "WellType": "WellType", "ControlWell": "Control", "CompoundWell": "Compound"}
+        self.log = log
 
 
     def xxx_repr_html_(self):
@@ -97,7 +98,7 @@ class DataSet():
     def well_type_from_position(self):
         """Assign the WellType from the position on the plate.
         Controls are in column 11 and 12"""
-        result = DataSet()
+        result = DataSet(log=self.log)
         result.data = well_type_from_position(self.data)
         return result
 
@@ -105,7 +106,7 @@ class DataSet():
     def well_from_position(self, well_name="Metadata_Well",
                            row_name="plateRow", col_name="plateColumn"):
         """Assign Metadata_Well from plateRow, plateColumn"""
-        result = DataSet()
+        result = DataSet(log=self.log)
         result.data = well_from_position(self.data, well_name=well_name,
                                          row_name=row_name, col_name=col_name)
         return result
@@ -114,16 +115,17 @@ class DataSet():
     def position_from_well(self, well_name="Metadata_Well",
                            row_name="plateRow", col_name="plateColumn"):
         """Generate plateRow and plateColumn from Metatadata_Well"""
-        result = DataSet()
+        result = DataSet(log=self.log)
         result.data = position_from_well(self.data, well_name=well_name,
                                          row_name=row_name, col_name=col_name)
         return result
 
 
     def join_layout_384(self, layout_fn, on="Address"):
-        result = DataSet()
+        result = DataSet(log=self.log)
         result.data = join_layout_384(self.data, layout_fn, on=on)
-        print("join layout 384:", result.shape)
+        if self.log:
+            print("join layout 384:    ", result.shape)
         return result
 
 
@@ -133,9 +135,10 @@ class DataSet():
         With this function, the 1536-to-384 reformatting file
         with the smiles added by join_smiles_to_layout_1536()
         can be used directly to join the layout to the individual 384er plates."""
-        result = DataSet()
+        result = DataSet(log=self.log)
         result.data = join_layout_1536(self.data, layout_fn, plate, on=on)
-        print("join layout 1536:", result.shape)
+        if self.log:
+            print("join layout 1536:   ", result.shape)
         return result
 
 
@@ -150,7 +153,8 @@ class DataSet():
         result = DataSet()
         toxic = DataSet()
         result.data, toxic.data = remove_toxic(self.data, cutoff=cutoff)
-        print("remove toxic:", result.shape)
+        if self.log:
+            print("remove toxic:       ", result.shape)
         return result, toxic
 
 
@@ -158,7 +162,8 @@ class DataSet():
         """Remove entries with `Pure_Flag == "Fail"`"""
         result = DataSet()
         result.data = remove_flagged(self.data)
-        print("remove flagged:s", result.shape)
+        if self.log:
+            print("remove flagged:     ", result.shape)
         return result
 
 
@@ -169,7 +174,8 @@ class DataSet():
         outliers = DataSet()
         result.data, outliers.data = remove_outliers(self.data, times_dev=times_dev,
                                                      group_by=group_by, method=method)
-        print("remove outliers:", result.shape)
+        if self.log:
+            print("remove outliers:    ", result.shape)
         return result, outliers
 
 
@@ -180,7 +186,8 @@ class DataSet():
         Returns a new dataframe without the skipped wells."""
         result = DataSet()
         result.data = remove_skipped_echo_direct_transfer(self.data, fn=fn)
-        print("remove skipped:", result.shape)
+        if self.log:
+            print("remove skipped:     ", result.shape)
         return result
 
 
@@ -188,7 +195,8 @@ class DataSet():
         """Group results on well level."""
         result = DataSet()
         result.data = group_on_well(self.data, group_by=group_by)
-        print("group on well:", result.shape)
+        if self.log:
+            print("group on well:      ", result.shape)
         return result
 
 
@@ -200,6 +208,8 @@ class DataSet():
             e.g. the column with plate name."""
         result = DataSet()
         result.data = poc(self.data, group_by=group_by)
+        if self.log:
+            print("POC:                ", result.shape)
         return result
 
 
@@ -216,7 +226,8 @@ class DataSet():
         result = DataSet()
         result.data = activity_profile(self.data, mad_mult=mad_mult, parameters=parameters,
                                        only_final=only_final)
-        print("activity profile:", result.shape)
+        if self.log:
+            print("activity profile:   ", result.shape)
         return result
 
 
@@ -224,7 +235,8 @@ class DataSet():
         result = DataSet()
         result.data = relevant_parameters(self.data, ctrls_mad_min=ctrls_mad_min, ctrls_mad_max=ctrls_mad_max,
                                           times_mad=times_mad)
-        print("relevant parameters:", result.shape)
+        if self.log:
+            print("relevant parameters:", result.shape)
         return result
 
 
@@ -240,7 +252,8 @@ class DataSet():
         Returns a new DataFrame with only the non-correlated columns"""
         result = DataSet()
         result.data = correlation_filter(self.data, cutoff=cutoff, method=method)
-        print("correlation filter:", result.shape)
+        if self.log:
+            print("correlation filter: ", result.shape)
         return result
 
 
@@ -249,7 +262,8 @@ class DataSet():
         `cutoff` gives the similarity threshold, default is 0.9."""
         result = DataSet()
         result.data = find_similar(self.data, act_profile=act_profile, cutoff=cutoff)
-        print("find similar:", result.shape)
+        if self.log:
+            print("find similar:       ", result.shape)
         return result
 
 
@@ -269,6 +283,8 @@ def load(fn):
 
     drop = [d for d in DROP_GLOBAL if d in result.data.keys()]
     result.data.drop(drop, axis=1, inplace=True)
+    if result.log:
+        print("load dataset:           ", result.shape)
     return result
 
 
@@ -353,7 +369,7 @@ def remove_skipped_echo_direct_transfer(df, fn):
     echo_print = ET.parse(echo_fn).getroot()
     skipped = echo_print.find("skippedwells")
     for well in skipped.findall("w"):
-        skipped_wells.append(cpt.format_well(well.get("n")))
+        skipped_wells.append(cpt.format_well(well.get("dn")))
     print("Skipped wells (will be removed):", skipped_wells)
     # remove the rows with the skipped wells
     #   i.e. keep the rows where Metadata_Well is not in the list skipped_wells
