@@ -29,33 +29,40 @@ im.save(outfile, "JPEG")
 import time
 import glob
 import os.path as op
+from collections import Counter
 import xml.etree.ElementTree as ET
 
 import pandas as pd
 import numpy as np
 
 from . import tools as cpt
-from .config import ACT_PROF_PARAMETERS
+from .config import ACT_PROF_PARAMETERS, ACT_CUTOFF
 
 try:
-    from misc_tools import apl_tools as apt
+    from misc_tools import apl_tools, comas_config
     AP_TOOLS = True
     #: Library version
-    VERSION = apt.get_commit(__file__)
+    VERSION = apl_tools.get_commit(__file__)
     # I use this to keep track of the library versions I use in my project notebooks
     print("{:45s} (commit: {})".format(__name__, VERSION))
+    COMAS = comas_config.COMAS
+    ANNOTATIONS = comas_config.ANNOTATIONS
+    REFERENCES = comas_config.REFERENCES
 
 except ImportError:
     AP_TOOLS = False
     print("{:45s} ({})".format(__name__, time.strftime("%y%m%d-%H:%M", time.localtime(op.getmtime(__file__)))))
+    COMAS = ""
+    ANNOTATIONS = ""
 
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
-                    "Compound_Id", 'Batch_Id', "Producer", "KnownAct",
-                    'WellType', 'Conc_uM', "Activity", "Act_Profile"]
+                    "Compound_Id", 'Batch_Id', "Producer", "KnownAct", "Trivial_Name",
+                    'WellType', 'Conc_uM', "Activity", "Act_Profile", "Smiles"]
 DROP_FROM_NUMBERS = ['plateColumn', 'plateRow', 'Conc_uM', "Compound_Id"]
 DROP_GLOBAL = ["PathName_CellOutlines", "URL_CellOutlines", 'FileName_CellOutlines',
                'ImageNumber', 'Metadata_Site', 'Metadata_Site_1', 'Metadata_Site_2']
+
 
 
 class DataSet():
@@ -73,12 +80,18 @@ class DataSet():
         return self.data[parameters]._repr_html_()
 
 
+    def head(self):
+        parameters = [k for k in FINAL_PARAMETERS if k in self.data]
+        print("Shape:     ", self.shape)
+        return self.data[parameters].head()
+
+
     def print_log(self, component, add_info=""):
         if self.log:
             component = component + ":"
             if len(add_info) > 0:
                 add_info = "    ({})".format(add_info)
-            print("{:25s} ({:4d} | {:4d}){}".format(component, self.shape[0], self.shape[1], add_info))
+            print("{:22s} ({:4d} | {:4d}){}".format(component, self.shape[0], self.shape[1], add_info))
 
 
     def load(self, fn):
@@ -86,6 +99,13 @@ class DataSet():
         `fn` is a single filename (string) or a list of filenames."""
         self.data = load(fn).data
         self.print_log("load data")
+
+
+    def write_csv(self, fn, parameters=None, sep="\t"):
+        result = self.data.copy()
+        if isinstance(parameters, list):
+            result = result[parameters]
+        result.write_csv(fn, sep=sep)
 
 
     def describe(self, times_mad=3.0):
@@ -126,14 +146,14 @@ class DataSet():
         return result
 
 
-    def join_layout_384(self, layout_fn, on="Address"):
+    def join_layout_384(self, layout_fn, on="Address_384"):
         result = DataSet(log=self.log)
         result.data = join_layout_384(self.data, layout_fn, on=on)
         result.print_log("join layout 384")
         return result
 
 
-    def join_layout_1536(self, layout_fn, plate, on="Address"):
+    def join_layout_1536(self, layout_fn, plate, on="Address_384"):
         """Cell Painting is always run in 384er plates.
         COMAS standard screening plates are format 1536.
         With this function, the 1536-to-384 reformatting file
@@ -201,6 +221,22 @@ class DataSet():
         return result
 
 
+    def join_smiles(self, df_smiles=None):
+        """Join Smiles from Compound_Id."""
+        result = DataSet()
+        result.data = join_smiles(self.data, df_smiles=df_smiles)
+        result.print_log("join smiles")
+        return result
+
+
+    def join_annotations(self):
+        """Join Annotations from Compound_Id."""
+        result = DataSet()
+        result.data = join_annotations(self.data)
+        result.print_log("join annotations")
+        return result
+
+
     def poc(self, group_by=None, well_type="WellType", control_name="Control"):
         """Normalize the data set to Percent-Of-Control per group (e.g. per plate)
         based on the median of the controls.
@@ -254,6 +290,20 @@ class DataSet():
         return result
 
 
+    def add_act_profile_for_control(self, parameters=ACT_PROF_PARAMETERS):
+        # Compound_Id DMSO: 245754
+        control = {"Compound_Id": 245754, "Trivial_Name": "Control", "Activity": 0,
+                   "Act_Profile": "".join(["1"] * len(parameters))}
+        ck = control.keys()
+        for k in ck:
+            if k not in self.data.keys():
+                control.pop(k)
+        tmp = pd.DataFrame(control)
+        result = DataSet()
+        result.data = pd.concat(self.data, tmp)
+        return result
+
+
     def find_similar(self, act_profile, cutoff=0.9):
         """Filter the dataframe for activity profiles similar to the given one.
         `cutoff` gives the similarity threshold, default is 0.9."""
@@ -261,6 +311,11 @@ class DataSet():
         result.data = find_similar(self.data, act_profile=act_profile, cutoff=cutoff)
         result.print_log("find similar")
         return result
+
+
+    def count_active_parameters(self, parameters=ACT_PROF_PARAMETERS):
+        """Counts the number of times each parameter has been active in the dataset."""
+        return count_active_parameters(self.data, parameters=ACT_PROF_PARAMETERS)
 
 
     @property
@@ -318,22 +373,46 @@ def join_layout_384(df, layout_fn, on="Address"):
     result = df.copy()
     result[on] = result["Metadata_Well"]
     layout = pd.read_csv(layout_fn)
-    result = result.join(layout, on=on)
+    result = result.merge(layout, on=on)
     result.drop(on, axis=1, inplace=True)
     return result
 
 
-def join_layout_1536(df, layout_fn, plate, on="Address"):
+def join_layout_1536(df, layout_fn, plate, on="Address_384", sep="\t"):
     """Cell Painting is always run in 384er plates.
     COMAS standard screening plates are format 1536.
     With this function, the 1536-to-384 reformatting file
     with the smiles added by join_smiles_to_layout_1536()
     can be used directly to join the layout to the individual 384er plates."""
     result = df.copy()
-    layout = pd.read_csv(layout_fn)
-    result[on] = plate[:-1] + result["Metadata_Well"]
-    result = result.join(layout, on=on)
+    layout = pd.read_csv(layout_fn, sep=sep)
+    layout[on] = layout["Plate_name_384"].str[-1:] + layout[on]
+    layout["Batch_Id"] = layout["Container_ID_1536"].str[:9]
+    layout["Compound_Id"] = layout["Container_ID_1536"].str[:6]
+    drop = ["Container_ID_1536", "Plate_name_384", "Plate_name_1536", "Address_1536", "Index"]
+    layout.drop(drop, axis=1, inplace=True)
+    result[on] = plate[-1:] + result["Metadata_Well"]
+    result = result.merge(layout, on=on, how="inner")
     result.drop(on, axis=1, inplace=True)
+    return result
+
+
+def join_smiles(df, df_smiles=None):
+    """Join Smiles from Compound_Id."""
+    keep = ['Compound_Id', "Producer", "Smiles", "Pure_Flag"]
+    if df_smiles is None:
+        df_smiles = pd.read_csv(COMAS, sep="\t")
+    elif isinstance(df_smiles, str):
+        df_smiles = pd.read_csv(df_smiles, sep="\t")
+    comas = pd.read_csv(COMAS, names=keep, sep="\t")
+    result = df.merge(comas, on="Compound_Id", how="inner")
+    return result
+
+
+def join_annotations(df):
+    """Join Annotations from Compound_Id."""
+    annotations = pd.read_csv(ANNOTATIONS, sep="\t")
+    result = df.merge(annotations, on="Compound_Id", how="left")
     return result
 
 
@@ -388,17 +467,6 @@ def remove_flagged(df, strict=False, reset_index=True):
         result = result.reset_index()
         outliers = outliers.reset_index()
     return result, outliers
-
-
-def _remove_outliers(df, times_mad=3.0):
-    include = [k for k in FINAL_PARAMETERS if k in df.keys()]
-    result = numeric_parameters(df)
-    mask = (result - result.median()).abs() - times_mad * result.mad() <= 0
-    result = result[(mask).all(axis=1)]
-    # add the non-numeric columns again
-    for k in include:
-        result[k] = df[k]
-    return result
 
 
 def remove_outliers(df, times_dev=3.0, group_by=None, method="median", reset_index=True):
@@ -601,3 +669,30 @@ def find_similar(df, act_profile, cutoff=0.9):
     `cutoff` gives the similarity threshold, default is 0.9."""
     result = df[df.apply(lambda x: cpt.profile_sim(x["Act_Profile"], act_profile) >= cutoff, axis=1)]
     return result
+
+
+def find_similar_in_refs(df, act_profile, df_refs=None, cutoff=0.9):
+    """Find and add references with similar activity profiles to the dataframe
+    `cutoff` gives the similarity threshold, default is 0.9."""
+    if df_refs is None:
+        df_refs = pd.read_csv(REFERENCES, sep="\t")
+    elif isinstance(df_refs, str):
+        df_refs = pd.read_csv(df_refs, sep="\t")
+    result = {"Compound_Id": [], "Activity": [], "Similar_Ref": [], "Similarity": [],
+              "Annotation": []}
+    for idx, rec in df.iterrows():
+        result["Compound_Id"].append(rec["Compound_Id"])
+        result["Activity"].append(rec["Activity"])
+
+
+def count_active_parameters(df, parameters=ACT_PROF_PARAMETERS):
+    """Counts the number of times each parameter has been active in the dataset."""
+    ctr_int = Counter()
+    ctr_str = Counter()
+    for _, rec in df.iterrows():
+        for idx, b in enumerate(rec["Act_Profile"]):
+            if b != "1":
+                ctr_int[idx] += 1
+    for idx in ctr_int:
+        ctr_str[parameters[idx]] = ctr_int[idx]
+    return ctr_str
