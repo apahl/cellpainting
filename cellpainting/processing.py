@@ -74,6 +74,13 @@ class DataSet():
         self.log = log
 
 
+    def __getattr__(self, name):
+        """Try to call undefined methods on the underlying pandas DataFrame."""
+        def method(*args, **kwargs):
+            return getattr(self.data, name)(*args, **kwargs)
+        return method
+
+
     def _repr_html_(self):
         parameters = [k for k in FINAL_PARAMETERS if k in self.data]
         print("Shape:     ", self.shape)
@@ -85,6 +92,17 @@ class DataSet():
         parameters = [k for k in FINAL_PARAMETERS if k in self.data]
         print("Shape:     ", self.shape)
         return self.data[parameters].head()
+
+
+    def drop_cols(self, cols, inplace=False):
+        if inplace:
+            self.data.drop(cols, axis=1, inplace=True)
+            self.print_log("drop cols (inplace)")
+        else:
+            result = DataSet()
+            result.data = self.data.drop(cols, axis=1, inplace=False)
+            result.print_log("drop cols")
+            return result
 
 
     def print_log(self, component, add_info=""):
