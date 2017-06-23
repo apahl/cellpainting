@@ -54,6 +54,7 @@ except ImportError:
     print("{:45s} ({})".format(__name__, time.strftime("%y%m%d-%H:%M", time.localtime(op.getmtime(__file__)))))
     COMAS = ""
     ANNOTATIONS = ""
+    REFERENCES = ""
 
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
@@ -94,10 +95,10 @@ class DataSet():
             print("{:22s} ({:4d} | {:4d}){}".format(component, self.shape[0], self.shape[1], add_info))
 
 
-    def load(self, fn):
+    def load(self, fn, sep="\t"):
         """Read one or multiple result files and concatenate them into one dataset.
         `fn` is a single filename (string) or a list of filenames."""
-        self.data = load(fn).data
+        self.data = load(fn, sep=sep).data
         self.print_log("load data")
 
 
@@ -313,9 +314,19 @@ class DataSet():
         return result
 
 
-    def count_active_parameters(self, parameters=ACT_PROF_PARAMETERS):
+    def find_similar_in_refs(self, act_profile, df_refs=None, cutoff=0.9, sep="\t"):
+        """Find and add references with similar activity profiles to the dataframe
+        `cutoff` gives the similarity threshold, default is 0.9."""
+        result = DataSet()
+        result.data = find_similar_in_refs(self.data, act_profile=act_profile,
+                                           cutoff=cutoff, sep=sep)
+        # result.print_log("find similar")
+        return result
+
+
+    def count_active_parameters_occurrences(self, parameters=ACT_PROF_PARAMETERS):
         """Counts the number of times each parameter has been active in the dataset."""
-        return count_active_parameters(self.data, parameters=ACT_PROF_PARAMETERS)
+        return count_active_parameters_occurrences(self.data, parameters=ACT_PROF_PARAMETERS)
 
 
     @property
@@ -323,14 +334,14 @@ class DataSet():
         return self.data.shape
 
 
-def load(fn):
+def load(fn, sep="\t"):
     """Read one or multiple result files and concatenate them into one dataset.
     `fn` is a single filename (string) or a list of filenames."""
     result = DataSet()
     if isinstance(fn, list):
-        result.data = pd.concat((pd.read_csv(f) for f in fn))
+        result.data = pd.concat((pd.read_csv(f, sep=sep) for f in fn))
     else:
-        result.data = pd.read_csv(fn)
+        result.data = pd.read_csv(fn, sep=sep)
 
     drop = [d for d in DROP_GLOBAL if d in result.data.keys()]
     result.data.drop(drop, axis=1, inplace=True)
@@ -667,25 +678,46 @@ def correlation_filter(df, cutoff=0.9, method="pearson"):
 def find_similar(df, act_profile, cutoff=0.9):
     """Filter the dataframe for activity profiles similar to the given one.
     `cutoff` gives the similarity threshold, default is 0.9."""
-    result = df[df.apply(lambda x: cpt.profile_sim(x["Act_Profile"], act_profile) >= cutoff, axis=1)]
+    result = df.copy()
+    result["Similarity"] = result["Act_Profile"].apply(lambda x: cpt.profile_sim(x["Act_Profile"],
+                                                                                 act_profile))
+    result = result[result["Similarity"] >= cutoff]
+    result.drop("Act_Profile", axis=1, inplace=True)
     return result
 
 
-def find_similar_in_refs(df, act_profile, df_refs=None, cutoff=0.9):
+def find_similar_in_refs(df, act_profile, df_refs=None, cutoff=0.9, sep="\t"):
     """Find and add references with similar activity profiles to the dataframe
     `cutoff` gives the similarity threshold, default is 0.9."""
     if df_refs is None:
-        df_refs = pd.read_csv(REFERENCES, sep="\t")
+        df_refs = load(REFERENCES, sep=sep)
     elif isinstance(df_refs, str):
-        df_refs = pd.read_csv(df_refs, sep="\t")
+        df_refs = load(df_refs, sep=sep)
+    df_refs.log = False
     result = {"Compound_Id": [], "Activity": [], "Similar_Ref": [], "Similarity": [],
-              "Annotation": []}
-    for idx, rec in df.iterrows():
-        result["Compound_Id"].append(rec["Compound_Id"])
-        result["Activity"].append(rec["Activity"])
+              "Trivial_Name": [], "Annotation": [], "Act_Flag": []}
+    for _, rec in df.iterrows():
+        if rec["Activity"] < ACT_CUTOFF:
+            result["Compound_Id"].append(rec["Compound_Id"])
+            result["Activity"].append(rec["Activity"])
+            result["Act_Flag"].append("InAct")
+            for k in ["Similar_Ref", "Similarity", "Annotation", "Trivial_Name"]:
+                result[k].append("")
+        else:
+            act_prof = rec["Activity_Profile"]
+            sim_refs = df_refs.find_similar(act_prof)
+            for _, ref in sim_refs.iterrows():
+                result["Compound_Id"].append(rec["Compound_Id"])
+                result["Activity"].append(rec["Activity"])
+                result["Act_Flag"].append("Active")
+                result["Similar_Ref"].append(ref["Compound_Id"])
+                result["Similarity"].append(ref["Similarity"])
+                result["Trivial_Name"].append(ref["Trivial_Name"])
+                result["Annotation"].append(ref["Annotation"])
+    return result
 
 
-def count_active_parameters(df, parameters=ACT_PROF_PARAMETERS):
+def count_active_parameters_occurrences(df, parameters=ACT_PROF_PARAMETERS):
     """Counts the number of times each parameter has been active in the dataset."""
     ctr_int = Counter()
     ctr_str = Counter()
