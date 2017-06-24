@@ -65,7 +65,6 @@ DROP_GLOBAL = ["PathName_CellOutlines", "URL_CellOutlines", 'FileName_CellOutlin
                'ImageNumber', 'Metadata_Site', 'Metadata_Site_1', 'Metadata_Site_2']
 
 
-
 class DataSet():
     def __init__(self, log=True):
         self.data = pd.DataFrame()
@@ -323,11 +322,11 @@ class DataSet():
         return result
 
 
-    def find_similar(self, act_profile, cutoff=0.9):
+    def find_similar(self, act_profile, cutoff=0.9, max_num=5):
         """Filter the dataframe for activity profiles similar to the given one.
         `cutoff` gives the similarity threshold, default is 0.9."""
         result = DataSet()
-        result.data = find_similar(self.data, act_profile=act_profile, cutoff=cutoff)
+        result.data = find_similar(self.data, act_profile=act_profile, cutoff=cutoff, max_num=max_num)
         result.print_log("find similar")
         return result
 
@@ -350,6 +349,12 @@ class DataSet():
     @property
     def shape(self):
         return self.data.shape
+
+
+    @property
+    def measurements(self):
+        """Returns a list of the CellProfiler parameters that are in the DataFrame."""
+        return measurements(self.data)
 
 
 def load(fn, sep="\t"):
@@ -445,10 +450,15 @@ def join_annotations(df):
     return result
 
 
+def measurements(df):
+    """Returns a list of the CellProfiler parameters that are in the DataFrame."""
+    parameters = [k for k in df.select_dtypes(include=[np.number]).keys()
+                  if k.startswith("Count_") or k.startswith("Mean_")]
+    return parameters
+
+
 def numeric_parameters(df):
-    result = df.copy().select_dtypes(include=[np.number])
-    drop = [d for d in DROP_FROM_NUMBERS if d in result.keys()]
-    result.drop(drop, axis=1, inplace=True)
+    result = df.copy()[measurements(df)]
     return result
 
 
@@ -693,7 +703,7 @@ def correlation_filter(df, cutoff=0.9, method="pearson"):
     return df[parameters_uncorr], iteration
 
 
-def find_similar(df, act_profile, cutoff=0.9):
+def find_similar(df, act_profile, cutoff=0.9, max_num=5):
     """Filter the dataframe for activity profiles similar to the given one.
     `cutoff` gives the similarity threshold, default is 0.9."""
     result = df.copy()
@@ -701,6 +711,7 @@ def find_similar(df, act_profile, cutoff=0.9):
                                                                                  act_profile))
     result = result[result["Similarity"] >= cutoff]
     result.drop("Act_Profile", axis=1, inplace=True)
+    result = result.sort_values("Similarity", ascending=False).head(max_num)
     return result
 
 
