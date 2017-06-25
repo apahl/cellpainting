@@ -104,6 +104,17 @@ class DataSet():
             return result
 
 
+    def keep_cols(self, cols, inplace=False):
+        if inplace:
+            self.data = self.data[cols]
+            self.print_log("keep cols (inplace)")
+        else:
+            result = DataSet()
+            result.data = self.data[cols]
+            result.print_log("keep cols")
+            return result
+
+
     def print_log(self, component, add_info=""):
         if self.log:
             component = component + ":"
