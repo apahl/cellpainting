@@ -363,6 +363,12 @@ class DataSet():
 
 
     @property
+    def metadata(self):
+        """Returns a list of the those parameters in the DataFrame that are NOT CellProfiler measurements."""
+        return metadata(self.data)
+
+
+    @property
     def measurements(self):
         """Returns a list of the CellProfiler parameters that are in the DataFrame."""
         return measurements(self.data)
@@ -420,6 +426,7 @@ def join_layout_384(df, layout_fn, on="Address"):
     layout = pd.read_csv(layout_fn)
     result = result.merge(layout, on=on)
     result.drop(on, axis=1, inplace=True)
+    result = result.apply(pd.to_numeric, errors='ignore')
     return result
 
 
@@ -439,18 +446,21 @@ def join_layout_1536(df, layout_fn, plate, on="Address_384", sep="\t"):
     result[on] = plate[-1:] + result["Metadata_Well"]
     result = result.merge(layout, on=on, how="inner")
     result.drop(on, axis=1, inplace=True)
+    result = result.apply(pd.to_numeric, errors='ignore')
     return result
 
 
 def join_smiles(df, df_smiles=None):
     """Join Smiles from Compound_Id."""
     keep = ['Compound_Id', "Producer", "Smiles", "Pure_Flag"]
+    # df["Compound_Id"] = df["Compound_Id"].astype(int)
     if df_smiles is None:
         df_smiles = pd.read_csv(COMAS, sep="\t")
+        df_smiles = df_smiles[keep]
     elif isinstance(df_smiles, str):
         df_smiles = pd.read_csv(df_smiles, sep="\t")
-    comas = pd.read_csv(COMAS, names=keep, sep="\t")
-    result = df.merge(comas, on="Compound_Id", how="inner")
+    result = df.merge(df_smiles, on="Compound_Id", how="inner")
+    result = result.apply(pd.to_numeric, errors='ignore')
     return result
 
 
@@ -459,6 +469,13 @@ def join_annotations(df):
     annotations = pd.read_csv(ANNOTATIONS, sep="\t")
     result = df.merge(annotations, on="Compound_Id", how="left")
     return result
+
+
+def metadata(df):
+    """Returns a list of the those parameters in the DataFrame that are NOT CellProfiler measurements."""
+    parameters = [k for k in df.keys()
+                  if not (k.startswith("Count_") or k.startswith("Mean_"))]
+    return parameters
 
 
 def measurements(df):
