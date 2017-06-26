@@ -11,6 +11,7 @@ Helper Tools acting on individual data..
 """
 
 import os.path as op
+from collections import Counter
 
 from rdkit_ipynb_tools import pipeline as ppl
 
@@ -106,3 +107,19 @@ def join_smiles_to_layout_1536(layout_fn, conc_um=10, struct_fn=STRUCT,
         anno_func,
         (ppl.stop_csv_writer, result_fn)
     )
+
+
+def find_dups(it):
+    """Find duplicates in an iterable."""
+    ctr = Counter(it)
+    result = {}
+    for c in ctr:
+        if ctr[c] > 1:
+            result[c] = ctr[c]
+    return result
+
+
+def print_dir(obj):
+    for f in dir(obj):
+        if not f.startswith("_"):
+            print(f)
