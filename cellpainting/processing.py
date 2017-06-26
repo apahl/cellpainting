@@ -73,6 +73,10 @@ class DataSet():
         self.log = log
 
 
+    def __getitem__(self, item):
+        return self.data[item]
+
+
     def __getattr__(self, name):
         """Try to call undefined methods on the underlying pandas DataFrame."""
         def method(*args, **kwargs):
