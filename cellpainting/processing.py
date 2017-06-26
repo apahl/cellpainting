@@ -393,6 +393,14 @@ def load(fn, sep="\t"):
     return result
 
 
+def read_smiles_file(fn, props=['Compound_Id', "Producer", "Smiles", "Pure_Flag"]):
+    """Read in the file with the Compound_Ids and the Simles.
+    Return a DataFrame for fast access."""
+    result = pd.read_csv(fn, sep="\t")
+    result = result[props]
+    return result
+
+
 def well_type_from_position(df):
     """Assign the WellType from the position on the plate.
     Controls are in column 11 and 12"""
@@ -623,9 +631,7 @@ def activity_profile(df, mad_mult=3.5, parameters=ACT_PROF_PARAMETERS, only_fina
     result = df.copy()
 
     if parameters is None:  # choose all numeric parameters
-        act_parameters = [k for k in df.select_dtypes(include=[np.number]).keys()
-                          if k.startswith("Count_") or k.startswith("Mean_")]
-        print(len(act_parameters))
+        act_parameters = measurements(df)
     else:
         act_parameters = parameters.copy()
     # sort parameters alphabetically
