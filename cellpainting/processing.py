@@ -76,7 +76,9 @@ class DataSet():
 
 
     def __getitem__(self, item):
-        return self.data[item]
+        result = DataSet()
+        result.data = self.data[item]
+        return result
 
 
     def __getattr__(self, name):
@@ -93,10 +95,10 @@ class DataSet():
         return HTML(self.data[parameters]._repr_html_())
 
 
-    def head(self):
+    def head(self, n=5):
         parameters = [k for k in FINAL_PARAMETERS if k in self.data]
         print("Shape:     ", self.shape)
-        return self.data[parameters].head()
+        return self.data[parameters].head(n)
 
 
     def drop_cols(self, cols, inplace=False):
@@ -140,7 +142,7 @@ class DataSet():
         result = self.data.copy()
         if isinstance(parameters, list):
             result = result[parameters]
-        result.write_csv(fn, sep=sep)
+        result.to_csv(fn, sep=sep, index=False)
 
 
     def describe(self, times_mad=3.0):
@@ -490,6 +492,7 @@ def join_annotations(df):
     """Join Annotations from Compound_Id."""
     annotations = pd.read_csv(ANNOTATIONS, sep="\t")
     result = df.merge(annotations, on="Compound_Id", how="left")
+    result = result.replace(np.nan, "", regex=True)
     return result
 
 
