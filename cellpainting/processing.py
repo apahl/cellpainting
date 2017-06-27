@@ -311,10 +311,10 @@ class DataSet():
         return result
 
 
-    def relevant_parameters(self, ctrls_mad_min=0.2, ctrls_mad_max=5.0, times_mad=3.5):
+    def relevant_parameters(self, ctrls_mad_rel_min=0.01, ctrls_mad_rel_max=0.10, times_mad=3.5):
         result = DataSet()
-        result.data = relevant_parameters(self.data, ctrls_mad_min=ctrls_mad_min, ctrls_mad_max=ctrls_mad_max,
-                                          times_mad=times_mad)
+        result.data = relevant_parameters(self.data, ctrls_mad_rel_min=ctrls_mad_rel_min,
+                                          ctrls_mad_rel_max=ctrls_mad_rel_max, times_mad=times_mad)
         result.print_log("relevant parameters")
         return result
 
@@ -674,19 +674,23 @@ def activity_profile(df, mad_mult=3.5, parameters=ACT_PROF_PARAMETERS, only_fina
     return result
 
 
-def relevant_parameters(df, ctrls_mad_min=0.2, ctrls_mad_max=5.0, times_mad=3.5):
+def relevant_parameters(df, ctrls_mad_rel_min=0.01, ctrls_mad_rel_max=0.10, times_mad=3.5):
+    """...mad_rel...: MAD relative to the median value"""
     relevant_table = FINAL_PARAMETERS.copy()
     result = df.copy()
     controls = df[df["WellType"] == "Control"].select_dtypes(include=[pd.np.number])
     compounds = df[df["WellType"] == "Compound"].select_dtypes(include=[pd.np.number])
 
-    ds = controls.mad() >= ctrls_mad_min
+    ds = controls.mad() / controls.median() >= ctrls_mad_rel_min
     ctrl_set = set([p for p in ds.keys() if ds[p]])
+    print(len(ctrl_set))
 
-    ds = controls.mad() < ctrls_mad_max
+    ds = controls.mad() / controls.median() < ctrls_mad_rel_max
     tmp_set = set([p for p in ds.keys() if ds[p]])
+    print(len(tmp_set))
 
     ctrl_set.intersection_update(tmp_set)
+    print(len(ctrl_set))
 
     controls = controls[list(ctrl_set)]
     compounds = compounds[list(ctrl_set)]
