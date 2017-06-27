@@ -35,6 +35,8 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 import numpy as np
 
+from IPython.core.display import HTML
+
 from . import tools as cpt
 from .config import ACT_PROF_PARAMETERS, ACT_CUTOFF
 
@@ -84,11 +86,11 @@ class DataSet():
         return method
 
 
-    def _repr_html_(self):
+    def show(self):
         parameters = [k for k in FINAL_PARAMETERS if k in self.data]
         print("Shape:     ", self.shape)
         print("Parameters:", parameters)
-        return self.data[parameters]._repr_html_()
+        return HTML(self.data[parameters]._repr_html_())
 
 
     def head(self):
@@ -213,13 +215,13 @@ class DataSet():
         return result, toxic
 
 
-    def remove_flagged(self):
+    def remove_flagged(self, strict=False, reset_index=True):
         """Remove entries with `Pure_Flag == "Fail"`"""
         result = DataSet()
         flagged = DataSet()
         result.data, flagged.data = remove_flagged(self.data)
         result.print_log("remove flagged", "{:3d} removed".format(flagged.shape[0]))
-        return result
+        return result, flagged
 
 
     def remove_outliers(self, times_dev=3.0, group_by=None, method="median"):
@@ -243,6 +245,14 @@ class DataSet():
         skipped_str = "(" + ", ".join(skipped) + ")"
         result.print_log("remove skipped", "{:3d} skipped {}".format(self.shape[0] - result.shape[0],
                                                                      skipped_str))
+        return result
+
+
+    def drop_dups(self, cpd_id="Compound_Id"):
+        """Drop duplicate Compound_Ids"""
+        result = DataSet()
+        result.data = self.data.drop_duplicates(cpd_id)
+        result.print_log("drop dups")
         return result
 
 
@@ -534,17 +544,20 @@ def remove_flagged(df, strict=False, reset_index=True):
     If `strict == True` compound with `Pure_Flag == Warn` are also removed."""
     result = df.copy()
     outliers_list = []
-    result = result[result["Pure_Flag"] != "Fail"]
     outl = result[result["Pure_Flag"] == "Fail"]
+    result = result[result["Pure_Flag"] != "Fail"]
+    print(outl.shape)
     outliers_list.append(outl)
     if strict:
-        result = result[result["Pure_Flag"] != "Warn"]
         outl = result[result["Pure_Flag"] == "Warn"]
+        result = result[result["Pure_Flag"] != "Warn"]
         outliers_list.append(outl)
     outliers = pd.concat(outliers_list)
     if reset_index:
         result = result.reset_index()
         outliers = outliers.reset_index()
+        result.drop("index", axis=1, inplace=True)
+        outliers.drop("index", axis=1, inplace=True)
     return result, outliers
 
 

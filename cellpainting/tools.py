@@ -119,6 +119,13 @@ def find_dups(it):
     return result
 
 
+def diff(it1, it2):
+    """Find the differences between two iterables"""
+    s2 = set(it2)
+    diff = [x for x in it1 if x not in s2]
+    return diff
+
+
 def print_dir(obj):
     for f in dir(obj):
         if not f.startswith("_"):
