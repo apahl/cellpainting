@@ -145,6 +145,10 @@ class DataSet():
         result.to_csv(fn, sep=sep, index=False)
 
 
+    def write_pkl(self, fn):
+        self.data.to_pickle(fn)
+
+
     def describe(self, times_mad=3.0):
         df = numeric_parameters(self.data)
         stats = pd.DataFrame()
@@ -402,6 +406,12 @@ def load(fn, sep="\t"):
     drop = [d for d in DROP_GLOBAL if d in result.data.keys()]
     result.data.drop(drop, axis=1, inplace=True)
     result.print_log("load dataset")
+    return result
+
+
+def load_pkl(fn):
+    result = DataSet()
+    result = data = pd.read_pickle(fn)
     return result
 
 
@@ -683,14 +693,11 @@ def relevant_parameters(df, ctrls_mad_rel_min=0.01, ctrls_mad_rel_max=0.10, time
 
     ds = controls.mad() / controls.median() >= ctrls_mad_rel_min
     ctrl_set = set([p for p in ds.keys() if ds[p]])
-    print(len(ctrl_set))
 
     ds = controls.mad() / controls.median() < ctrls_mad_rel_max
     tmp_set = set([p for p in ds.keys() if ds[p]])
-    print(len(tmp_set))
 
     ctrl_set.intersection_update(tmp_set)
-    print(len(ctrl_set))
 
     controls = controls[list(ctrl_set)]
     compounds = compounds[list(ctrl_set)]
