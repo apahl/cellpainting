@@ -65,6 +65,13 @@ FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow'
 DROP_FROM_NUMBERS = ['plateColumn', 'plateRow', 'Conc_uM', "Compound_Id"]
 DROP_GLOBAL = ["PathName_CellOutlines", "URL_CellOutlines", 'FileName_CellOutlines',
                'ImageNumber', 'Metadata_Site', 'Metadata_Site_1', 'Metadata_Site_2']
+DEBUG = False
+
+
+def debug_print(txt, val):
+    if DEBUG:
+        txt = txt + ":"
+        print("DEBUG   {:20s}".format(txt), val)
 
 
 class DataSet():
@@ -76,15 +83,27 @@ class DataSet():
 
 
     def __getitem__(self, item):
-        result = DataSet()
-        result.data = self.data[item]
+        res = self.data[item]
+        if isinstance(res, pd.DataFrame):
+            result = DataSet()
+            result.data = res
+            result.print_log("subset")
+        else:
+            result = res
         return result
 
 
     def __getattr__(self, name):
         """Try to call undefined methods on the underlying pandas DataFrame."""
         def method(*args, **kwargs):
-            return getattr(self.data, name)(*args, **kwargs)
+            res = getattr(self.data, name)(*args, **kwargs)
+            if isinstance(res, pd.DataFrame):
+                result = DataSet()
+                result.data = res
+                result.print_log(name)
+            else:
+                result = res
+            return result
         return method
 
 
@@ -166,6 +185,7 @@ class DataSet():
         Controls are in column 11 and 12"""
         result = DataSet(log=self.log)
         result.data = well_type_from_position(self.data)
+        result.print_log("well type from pos")
         return result
 
 
@@ -175,6 +195,7 @@ class DataSet():
         result = DataSet(log=self.log)
         result.data = well_from_position(self.data, well_name=well_name,
                                          row_name=row_name, col_name=col_name)
+        result.print_log("well from pos")
         return result
 
 
@@ -184,6 +205,7 @@ class DataSet():
         result = DataSet(log=self.log)
         result.data = position_from_well(self.data, well_name=well_name,
                                          row_name=row_name, col_name=col_name)
+        result.print_log("pos from well")
         return result
 
 
@@ -315,10 +337,12 @@ class DataSet():
         return result
 
 
-    def relevant_parameters(self, ctrls_mad_rel_min=0.01, ctrls_mad_rel_max=0.10, times_mad=3.5):
+    def relevant_parameters(self, ctrls_mad_rel_min=0.01,
+                            ctrls_mad_rel_max=0.10, use_cpds=True, times_mad=3.5):
         result = DataSet()
         result.data = relevant_parameters(self.data, ctrls_mad_rel_min=ctrls_mad_rel_min,
-                                          ctrls_mad_rel_max=ctrls_mad_rel_max, times_mad=times_mad)
+                                          ctrls_mad_rel_max=ctrls_mad_rel_max,
+                                          use_cpds=use_cpds, times_mad=times_mad)
         result.print_log("relevant parameters")
         return result
 
@@ -411,7 +435,7 @@ def load(fn, sep="\t"):
 
 def load_pkl(fn):
     result = DataSet()
-    result = data = pd.read_pickle(fn)
+    result.data = pd.read_pickle(fn)
     return result
 
 
@@ -660,6 +684,7 @@ def activity_profile(df, mad_mult=3.5, parameters=ACT_PROF_PARAMETERS, only_fina
         act_parameters = measurements(df)
     else:
         act_parameters = parameters.copy()
+    assert len(act_parameters) > 0
     # sort parameters alphabetically
     act_parameters.sort()
     controls = df[act_parameters][df["WellType"] == "Control"]
@@ -684,38 +709,55 @@ def activity_profile(df, mad_mult=3.5, parameters=ACT_PROF_PARAMETERS, only_fina
     return result
 
 
-def relevant_parameters(df, ctrls_mad_rel_min=0.01, ctrls_mad_rel_max=0.10, times_mad=3.5):
+def relevant_parameters(df, ctrls_mad_rel_min=0.01,
+                        ctrls_mad_rel_max=0.025, use_cpds=True, times_mad=3.5):
     """...mad_rel...: MAD relative to the median value"""
     relevant_table = FINAL_PARAMETERS.copy()
-    result = df.copy()
+    # result = df.copy()
     controls = df[df["WellType"] == "Control"].select_dtypes(include=[pd.np.number])
     compounds = df[df["WellType"] == "Compound"].select_dtypes(include=[pd.np.number])
 
     ds = controls.mad() / controls.median() >= ctrls_mad_rel_min
     ctrl_set = set([p for p in ds.keys() if ds[p]])
+    debug_print("ctrl_set", len(ctrl_set))
 
-    ds = controls.mad() / controls.median() < ctrls_mad_rel_max
+    ds = controls.mad() / controls.median() <= ctrls_mad_rel_max
     tmp_set = set([p for p in ds.keys() if ds[p]])
+    debug_print("tmp_set", len(tmp_set))
+
 
     ctrl_set.intersection_update(tmp_set)
+    debug_print("ctrl_set", len(ctrl_set))
 
-    controls = controls[list(ctrl_set)]
-    compounds = compounds[list(ctrl_set)]
+    if use_cpds:  # remove also those parameters for which no cpd shows significant activity
+        controls = controls[list(ctrl_set)]
+        compounds = compounds[list(ctrl_set)]
+        # global debug
+        # debug =
 
-    ds = compounds.max() - controls.median() - times_mad * controls.mad() > 0
-    cpd_max_set = set([p for p in ds.keys() if ds[p]])
-    ds = controls.median() - compounds.min() - times_mad * controls.mad() > 0
-    cpd_min_set = set([p for p in ds.keys() if ds[p]])
+        ds = compounds.max() - controls.median() - times_mad * controls.mad() > 0
+        cpd_max_set = set([p for p in ds.keys() if ds[p]])
+        debug_print("cpd_max_set", len(cpd_max_set))
 
-    cpd_set = cpd_max_set.union(cpd_min_set)
+        ds = controls.median() - compounds.min() - times_mad * controls.mad() > 0
+        cpd_min_set = set([p for p in ds.keys() if ds[p]])
+        debug_print("cpd_min_set", len(cpd_min_set))
 
-    for p in cpd_set:
-        relevant_table.append(p)
+        cpd_set = cpd_max_set.union(cpd_min_set)
+    else:
+        cpd_set = ctrl_set
+    debug_print("cpd_set", len(cpd_set))
 
-    result_keys = list(result.keys())
+    relevant_table.extend(list(cpd_set))
+    debug_print("relevant_table", len(relevant_table))
+
+    result_keys = list(df.keys())
+    keep = []
     for key in result_keys:
-        if key not in relevant_table:
-            result.drop(key, axis=1, inplace=True)
+        if key in relevant_table:
+            keep.append(key)
+    result = df[keep]
+    debug_print("keep", len(keep))
     return result
 
 
