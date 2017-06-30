@@ -10,6 +10,7 @@ Tools
 Helper Tools acting on individual data..
 """
 
+import os
 import os.path as op
 from collections import Counter
 
@@ -130,3 +131,8 @@ def print_dir(obj):
     for f in dir(obj):
         if not f.startswith("_"):
             print(f)
+
+
+def create_dirs(path):
+    if not op.exists(path):
+        os.makedirs(path)

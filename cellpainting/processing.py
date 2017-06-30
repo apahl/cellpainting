@@ -60,7 +60,7 @@ except ImportError:
 
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
-                    "Compound_Id", 'Batch_Id', "Producer", "KnownAct", "Trivial_Name",
+                    "Compound_Id", 'Batch_Id', "Producer", "Pure_Flag", "KnownAct", "Trivial_Name",
                     'WellType', 'Conc_uM', "Activity", "Act_Profile", "Smiles"]
 DROP_FROM_NUMBERS = ['plateColumn', 'plateRow', 'Conc_uM', "Compound_Id"]
 DROP_GLOBAL = ["PathName_CellOutlines", "URL_CellOutlines", 'FileName_CellOutlines',
@@ -116,9 +116,11 @@ class DataSet():
 
     def head(self, n=5):
         parameters = [k for k in FINAL_PARAMETERS if k in self.data]
-        print("Shape:     ", self.shape)
-        return self.data[parameters].head(n)
-
+        res = self.data[parameters].head(n)
+        result = DataSet()
+        result.data = res
+        result.print_log("head")
+        return result
 
     def drop_cols(self, cols, inplace=False):
         if inplace:
@@ -166,6 +168,15 @@ class DataSet():
 
     def write_pkl(self, fn):
         self.data.to_pickle(fn)
+
+
+    def write_parameters(self, fn="parameters.txt"):
+        parameters = sorted(self.measurements)
+        with open("parameters.txt", "w") as f:
+            f.write('"')
+            f.write('",\n"'.join(parameters))
+            f.write('"')
+        print(len(parameters), "parameters written.")
 
 
     def describe(self, times_mad=3.0):
@@ -216,14 +227,14 @@ class DataSet():
         return result
 
 
-    def join_layout_1536(self, layout_fn, plate, on="Address_384"):
+    def join_layout_1536(self, layout_fn, plate, on="Address_384", how="inner"):
         """Cell Painting is always run in 384er plates.
         COMAS standard screening plates are format 1536.
         With this function, the 1536-to-384 reformatting file
         with the smiles added by join_smiles_to_layout_1536()
         can be used directly to join the layout to the individual 384er plates."""
         result = DataSet(log=self.log)
-        result.data = join_layout_1536(self.data, layout_fn, plate, on=on)
+        result.data = join_layout_1536(self.data, layout_fn, plate, on=on, how=how)
         result.print_log("join layout 1536")
         return result
 
@@ -343,7 +354,9 @@ class DataSet():
         result.data = relevant_parameters(self.data, ctrls_mad_rel_min=ctrls_mad_rel_min,
                                           ctrls_mad_rel_max=ctrls_mad_rel_max,
                                           use_cpds=use_cpds, times_mad=times_mad)
-        result.print_log("relevant parameters")
+        result.print_log("relevant parameters", "{:.3f}/{:.3f}/{:.2f}".format(ctrls_mad_rel_min,
+                                                                              ctrls_mad_rel_max,
+                                                                              times_mad))
         return result
 
 
@@ -386,12 +399,12 @@ class DataSet():
         return result
 
 
-    def find_similar_in_refs(self, act_profile, df_refs=None, cutoff=0.9, sep="\t"):
+    def find_similar_in_refs(self, cpd_ids=None, df_refs=None, cutoff=0.5, max_num=5, sep="\t"):
         """Find and add references with similar activity profiles to the dataframe
         `cutoff` gives the similarity threshold, default is 0.9."""
         result = DataSet()
-        result.data = find_similar_in_refs(self.data, act_profile=act_profile,
-                                           cutoff=cutoff, sep=sep)
+        result.data = find_similar_in_refs(self.data, cpd_ids=cpd_ids, df_refs=df_refs,
+                                           cutoff=cutoff, max_num=max_num, sep=sep)
         # result.print_log("find similar")
         return result
 
@@ -436,6 +449,7 @@ def load(fn, sep="\t"):
 def load_pkl(fn):
     result = DataSet()
     result.data = pd.read_pickle(fn)
+    result.print_log("load pickle")
     return result
 
 
@@ -488,7 +502,7 @@ def join_layout_384(df, layout_fn, on="Address"):
     return result
 
 
-def join_layout_1536(df, layout_fn, plate, on="Address_384", sep="\t"):
+def join_layout_1536(df, layout_fn, plate, on="Address_384", sep="\t", how="inner"):
     """Cell Painting is always run in 384er plates.
     COMAS standard screening plates are format 1536.
     With this function, the 1536-to-384 reformatting file
@@ -502,7 +516,7 @@ def join_layout_1536(df, layout_fn, plate, on="Address_384", sep="\t"):
     drop = ["Container_ID_1536", "Plate_name_384", "Plate_name_1536", "Address_1536", "Index"]
     layout.drop(drop, axis=1, inplace=True)
     result[on] = plate[-1:] + result["Metadata_Well"]
-    result = result.merge(layout, on=on, how="inner")
+    result = result.merge(layout, on=on, how=how)
     result.drop(on, axis=1, inplace=True)
     result = result.apply(pd.to_numeric, errors='ignore')
     return result
@@ -517,6 +531,7 @@ def join_smiles(df, df_smiles=None):
         df_smiles = df_smiles[keep]
     elif isinstance(df_smiles, str):
         df_smiles = pd.read_csv(df_smiles, sep="\t")
+    df_smiles["Compound_Id"] = df_smiles["Compound_Id"].astype("int")
     result = df.merge(df_smiles, on="Compound_Id", how="inner")
     result = result.apply(pd.to_numeric, errors='ignore')
     return result
@@ -525,6 +540,7 @@ def join_smiles(df, df_smiles=None):
 def join_annotations(df):
     """Join Annotations from Compound_Id."""
     annotations = pd.read_csv(ANNOTATIONS, sep="\t")
+    annotations["Compound_Id"] = annotations["Compound_Id"].astype("int")
     result = df.merge(annotations, on="Compound_Id", how="left")
     result = result.replace(np.nan, "", regex=True)
     return result
@@ -583,7 +599,6 @@ def remove_flagged(df, strict=False, reset_index=True):
     outliers_list = []
     outl = result[result["Pure_Flag"] == "Fail"]
     result = result[result["Pure_Flag"] != "Fail"]
-    print(outl.shape)
     outliers_list.append(outl)
     if strict:
         outl = result[result["Pure_Flag"] == "Warn"]
@@ -710,7 +725,7 @@ def activity_profile(df, mad_mult=3.5, parameters=ACT_PROF_PARAMETERS, only_fina
 
 
 def relevant_parameters(df, ctrls_mad_rel_min=0.01,
-                        ctrls_mad_rel_max=0.025, use_cpds=True, times_mad=3.5):
+                        ctrls_mad_rel_max=0.1, use_cpds=True, times_mad=3.5):
     """...mad_rel...: MAD relative to the median value"""
     relevant_table = FINAL_PARAMETERS.copy()
     # result = df.copy()
@@ -814,7 +829,7 @@ def find_similar(df, act_profile, cutoff=0.9, max_num=5):
     """Filter the dataframe for activity profiles similar to the given one.
     `cutoff` gives the similarity threshold, default is 0.9."""
     result = df.copy()
-    result["Similarity"] = result["Act_Profile"].apply(lambda x: cpt.profile_sim(x["Act_Profile"],
+    result["Similarity"] = result["Act_Profile"].apply(lambda x: cpt.profile_sim(x,
                                                                                  act_profile))
     result = result[result["Similarity"] >= cutoff]
     result.drop("Act_Profile", axis=1, inplace=True)
@@ -822,7 +837,7 @@ def find_similar(df, act_profile, cutoff=0.9, max_num=5):
     return result
 
 
-def find_similar_in_refs(df, act_profile, df_refs=None, cutoff=0.9, sep="\t"):
+def find_similar_in_refs(df, cpd_ids=None, df_refs=None, cutoff=0.5, max_num=5, sep="\t"):
     """Find and add references with similar activity profiles to the dataframe
     `cutoff` gives the similarity threshold, default is 0.9."""
     if df_refs is None:
@@ -830,37 +845,53 @@ def find_similar_in_refs(df, act_profile, df_refs=None, cutoff=0.9, sep="\t"):
     elif isinstance(df_refs, str):
         df_refs = load(df_refs, sep=sep)
     df_refs.log = False
-    result = {"Compound_Id": [], "Activity": [], "Similar_Ref": [], "Similarity": [],
-              "Trivial_Name": [], "Annotation": [], "Act_Flag": []}
-    for _, rec in df.iterrows():
+    df_refs.data = df_refs.data.replace(np.nan, "", regex=True)
+    if cpd_ids is None:
+        cpd_ids = list(df["Compound_Id"])
+    df_cpds = df[df["Compound_Id"].isin(cpd_ids)]
+    result = {"Compound_Id": [], "Producer": [], "Activity": [], "Similar_Ref": [], "Similarity": [],
+              "Trivial_Name": [], "Known_Act": [], "Act_Flag": []}
+    for _, rec in df_cpds.iterrows():
         if rec["Activity"] < ACT_CUTOFF:
             result["Compound_Id"].append(rec["Compound_Id"])
+            result["Producer"].append(rec["Producer"])
             result["Activity"].append(rec["Activity"])
             result["Act_Flag"].append("InAct")
-            for k in ["Similar_Ref", "Similarity", "Annotation", "Trivial_Name"]:
+            for k in ["Similar_Ref", "Similarity", "Known_Act", "Trivial_Name"]:
                 result[k].append("")
         else:
-            act_prof = rec["Activity_Profile"]
-            sim_refs = df_refs.find_similar(act_prof)
-            for _, ref in sim_refs.iterrows():
+            act_prof = rec["Act_Profile"]
+            sim_refs = df_refs.find_similar(act_prof, cutoff=cutoff, max_num=max_num)
+            if sim_refs.shape[0] > 0:
+                for _, ref in sim_refs.iterrows():
+                    result["Compound_Id"].append(rec["Compound_Id"])
+                    result["Producer"].append(rec["Producer"])
+                    result["Activity"].append(rec["Activity"])
+                    result["Act_Flag"].append("Active")
+                    result["Similar_Ref"].append(ref["Compound_Id"])
+                    result["Similarity"].append(ref["Similarity"])
+                    result["Trivial_Name"].append(ref["Trivial_Name"])
+                    result["Known_Act"].append(ref["Known_Act"])
+            else:
                 result["Compound_Id"].append(rec["Compound_Id"])
+                result["Producer"].append(rec["Producer"])
                 result["Activity"].append(rec["Activity"])
                 result["Act_Flag"].append("Active")
-                result["Similar_Ref"].append(ref["Compound_Id"])
-                result["Similarity"].append(ref["Similarity"])
-                result["Trivial_Name"].append(ref["Trivial_Name"])
-                result["Annotation"].append(ref["Annotation"])
-    return result
+                result["Similar_Ref"].append("None")
+                result["Similarity"].append("None")
+                result["Trivial_Name"].append("")
+                result["Known_Act"].append("")
+    return pd.DataFrame(result)
 
 
 def count_active_parameters_occurrences(df, parameters=ACT_PROF_PARAMETERS):
     """Counts the number of times each parameter has been active in the dataset."""
     ctr_int = Counter()
-    ctr_str = Counter()
+    ctr_str = {}
     for _, rec in df.iterrows():
         for idx, b in enumerate(rec["Act_Profile"]):
             if b != "1":
                 ctr_int[idx] += 1
-    for idx in ctr_int:
-        ctr_str[parameters[idx]] = ctr_int[idx]
+    for k, val in ctr_int.items():
+        ctr_str[parameters[k]] = val
     return ctr_str

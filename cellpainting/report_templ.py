@@ -16,11 +16,12 @@ In [4]: report_all.substitute(tmap)
 Out[4]: 'Axel, this is a Test for Templates.'
 """
 
+from string import Template
+
+
 TABLE_OPTIONS = {"cellspacing": "1", "cellpadding": "1", "border": "1",
                  "align": "", "height": "60px", "summary": "Table", }  # "width": "800px",
 PAGE_OPTIONS = {"icon": "icons/benzene.png"}
-
-HTML_FILE_NAME = "report.html"
 
 CSS = """<style>
   body{
@@ -52,6 +53,26 @@ table {
   text-align: left;
 }
 </style>"""
+
+TABLE_INTRO = """<table id="table" width="" cellspacing="1" cellpadding="1" border="1" align="center" height="60" summary="">
+</tbody>"""
+TABLE_EXTRO = """</tbody>
+</table>"""
+HTML_INTRO = """<!DOCTYPE html>
+<html>
+<head>
+  <title>$title</title>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" type="text/css" href="css/style.css" />
+  $css
+</head>
+<body>
+"""
+t = Template(HTML_INTRO)
+HTML_INTRO = t.substitute(css=CSS, title="$title")  # outwitting the formatter...
+HTML_EXTRO = """
+</body>
+</html>"""
 
 
 def page(content, title="Results", header=None, summary=None, options=PAGE_OPTIONS):
