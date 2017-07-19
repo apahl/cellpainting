@@ -38,7 +38,7 @@ import numpy as np
 from IPython.core.display import HTML
 
 from . import tools as cpt
-from .config import ACT_PROF_PARAMETERS, ACT_CUTOFF
+from .config import ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC
 
 try:
     from misc_tools import apl_tools, comas_config
@@ -60,7 +60,7 @@ except ImportError:
 
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
-                    "Compound_Id", 'Batch_Id', "Producer", "Pure_Flag", "KnownAct", "Trivial_Name",
+                    "Compound_Id", 'Batch_Id', "Producer", "Pure_Flag", "Known_Act", "Trivial_Name",
                     'WellType', 'Conc_uM', "Activity", "Act_Profile", "Smiles"]
 DROP_FROM_NUMBERS = ['plateColumn', 'plateRow', 'Conc_uM', "Compound_Id"]
 DROP_GLOBAL = ["PathName_CellOutlines", "URL_CellOutlines", 'FileName_CellOutlines',
@@ -399,9 +399,9 @@ class DataSet():
         return result
 
 
-    def find_similar_in_refs(self, cpd_ids=None, df_refs=None, cutoff=0.5, max_num=5, sep="\t"):
+    def find_similar_in_refs(self, cpd_ids=None, df_refs=None, cutoff=0.6, max_num=5, sep="\t"):
         """Find and add references with similar activity profiles to the dataframe
-        `cutoff` gives the similarity threshold, default is 0.9."""
+        `cutoff` gives the similarity threshold, default is 0.6."""
         result = DataSet()
         result.data = find_similar_in_refs(self.data, cpd_ids=cpd_ids, df_refs=df_refs,
                                            cutoff=cutoff, max_num=max_num, sep=sep)
@@ -714,7 +714,7 @@ def activity_profile(df, mad_mult=3.5, parameters=ACT_PROF_PARAMETERS, only_fina
         result.loc[df[key] > upper_bound, [key]] = 2
 
     result[act_parameters] = result[act_parameters].astype(int)
-    result["Activity"] = (result[act_parameters] != 1).sum(axis=1)
+    result["Activity"] = 100 * (result[act_parameters] != 1).sum(axis=1) / len(act_parameters)
     result["Act_Profile"] = result[act_parameters].astype(str).apply(lambda x: "".join(x), axis=1)
 
     if only_final:
@@ -787,8 +787,8 @@ def correlation_filter(df, cutoff=0.9, method="pearson"):
     iteration = 0
     while True:
         cm = df_copy.corr(method=method)
-
-        ds = cm[cm > cutoff].count().sort_values(ascending=False)
+        correlated = cm[cm > cutoff]
+        ds = correlated.count().sort_values(ascending=False)
         if ds[0] == 1: break  # no more correlations
         iteration += 1
 
@@ -801,22 +801,25 @@ def correlation_filter(df, cutoff=0.9, method="pearson"):
         for i in range(len(ds)):
             if ds[i] < num_correlated: break  # only compare columns with the same highest correlation
             k = ds.keys()[i]
+            debug_print("  k", k)
             r = df_copy[k].max() - df_copy[k].min()
             if r > rnge:
                 rnge = r
                 rnge_key = k
 
-        # print(rnge_key, "  (", num_correlated, ")")
         keep_it = rnge_key
-        # print("keep_it:", keep_it)
         parameters_uncorr.append(keep_it)
+        debug_print("keep_it", keep_it)
+        debug_print("num_corr.", num_correlated)
 
-        parameters_to_remove = list(cm[keep_it][cm[keep_it] > cutoff].keys())
+        # find the parameters actually correlated to `keep_it`
+        # parameters_to_remove = list(cm[keep_it][cm[keep_it] > cutoff].keys())
+        parameters_to_remove = list(correlated[keep_it][correlated[keep_it].notnull()].keys())
         # The uncorrelated parameter `keep_it` is also in this list and has to be removed from it:
         # parameters_to_remove.remove(keep_it)
-        # print("parameters_to_remove:", parameters_to_remove)
+        debug_print("param_to_rem", parameters_to_remove)
 
-        # remove the correlated parameters from both axes:
+        # remove the correlated parameters:
         df_copy.drop(parameters_to_remove, axis=1, inplace=True)
 
     parameters_uncorr.extend(df_copy.keys())
@@ -825,7 +828,7 @@ def correlation_filter(df, cutoff=0.9, method="pearson"):
     return df[parameters_uncorr], iteration
 
 
-def find_similar(df, act_profile, cutoff=0.9, max_num=5):
+def find_similar(df, act_profile, cutoff=0.6, max_num=3):
     """Filter the dataframe for activity profiles similar to the given one.
     `cutoff` gives the similarity threshold, default is 0.9."""
     result = df.copy()
@@ -837,22 +840,19 @@ def find_similar(df, act_profile, cutoff=0.9, max_num=5):
     return result
 
 
-def find_similar_in_refs(df, cpd_ids=None, df_refs=None, cutoff=0.5, max_num=5, sep="\t"):
+def find_similar_in_refs(df, cpd_ids=None, df_refs=None, cutoff=0.6, max_num=5, sep="\t"):
     """Find and add references with similar activity profiles to the dataframe
-    `cutoff` gives the similarity threshold, default is 0.9."""
-    if df_refs is None:
-        df_refs = load(REFERENCES, sep=sep)
-    elif isinstance(df_refs, str):
-        df_refs = load(df_refs, sep=sep)
-    df_refs.log = False
-    df_refs.data = df_refs.data.replace(np.nan, "", regex=True)
+    `cutoff` gives the similarity threshold, default is 0.6."""
+    ds_refs = DataSet()
+    df_refs = cpt.check_df(df_refs, REFERENCES)
+    ds_refs.data = df_refs.replace(np.nan, "", regex=True)
     if cpd_ids is None:
         cpd_ids = list(df["Compound_Id"])
     df_cpds = df[df["Compound_Id"].isin(cpd_ids)]
     result = {"Compound_Id": [], "Producer": [], "Activity": [], "Similar_Ref": [], "Similarity": [],
               "Trivial_Name": [], "Known_Act": [], "Act_Flag": []}
     for _, rec in df_cpds.iterrows():
-        if rec["Activity"] < ACT_CUTOFF:
+        if rec["Activity"] < ACT_CUTOFF_PERC:
             result["Compound_Id"].append(rec["Compound_Id"])
             result["Producer"].append(rec["Producer"])
             result["Activity"].append(rec["Activity"])
@@ -861,7 +861,7 @@ def find_similar_in_refs(df, cpd_ids=None, df_refs=None, cutoff=0.5, max_num=5, 
                 result[k].append("")
         else:
             act_prof = rec["Act_Profile"]
-            sim_refs = df_refs.find_similar(act_prof, cutoff=cutoff, max_num=max_num)
+            sim_refs = ds_refs.find_similar(act_prof, cutoff=cutoff, max_num=max_num)
             if sim_refs.shape[0] > 0:
                 for _, ref in sim_refs.iterrows():
                     result["Compound_Id"].append(rec["Compound_Id"])

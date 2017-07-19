@@ -14,6 +14,8 @@ import os
 import os.path as op
 from collections import Counter
 
+import pandas as pd
+
 from rdkit_ipynb_tools import pipeline as ppl
 
 ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P",
@@ -136,3 +138,11 @@ def print_dir(obj):
 def create_dirs(path):
     if not op.exists(path):
         os.makedirs(path)
+
+
+def check_df(df, fn):
+    if df is None:
+        df = pd.read_csv(fn, sep="\t")  # load default file (REFERENCES or COMAS)
+    elif isinstance(df, str):
+        df = pd.read_csv(df, sep="\t")
+    return df

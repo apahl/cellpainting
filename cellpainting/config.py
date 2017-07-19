@@ -341,4 +341,5 @@ ACT_PROF_PARAMETERS = [
     "Mean_Nuclei_Texture_Variance_Syto_5_0"
 ]
 
-ACT_CUTOFF = int(0.033 * len(ACT_PROF_PARAMETERS))
+# ACT_CUTOFF = int(0.033 * len(ACT_PROF_PARAMETERS))
+ACT_CUTOFF_PERC = 3.3

@@ -18,7 +18,7 @@ Out[4]: 'Axel, this is a Test for Templates.'
 
 from string import Template
 
-
+HTML_FILE_NAME = "report.html"
 TABLE_OPTIONS = {"cellspacing": "1", "cellpadding": "1", "border": "1",
                  "align": "", "height": "60px", "summary": "Table", }  # "width": "800px",
 PAGE_OPTIONS = {"icon": "icons/benzene.png"}
@@ -63,7 +63,6 @@ HTML_INTRO = """<!DOCTYPE html>
 <head>
   <title>$title</title>
   <meta charset="UTF-8">
-  <link rel="stylesheet" type="text/css" href="css/style.css" />
   $css
 </head>
 <body>
@@ -73,6 +72,31 @@ HTML_INTRO = t.substitute(css=CSS, title="$title")  # outwitting the formatter..
 HTML_EXTRO = """
 </body>
 </html>"""
+
+OVERVIEW_TABLE_HEADER = """
+<tr>
+    <td><b>Idx</b></td>
+    <td><b>Mol</b></td>
+    <td><b>Compound_Id</b></td>
+    <td><b>Producer</b></td>
+    <td><b>Act_Flag</b></td>
+    <td><b>Activity</b></td>
+    <td><b>Number of<br>Similar References</b></td>
+    <td><b>Link to<br>Detailed Report</b></td>
+</tr>"""
+
+OVERVIEW_TABLE_ROW = """
+<tr>
+    <td><b>$idx</b></td>
+    <td><b>$mol_img</b></td>
+    <td><b>$Compound_Id</b></td>
+    <td><b>$Producer</b></td>
+    <td><b>$Act_Flag</b></td>
+    <td><b>$Activity</b></td>
+    <td><b>$Num_Sim_Ref</b></td>
+    <td><b>$Link</b></td>
+</tr>"""
+
 
 
 def page(content, title="Results", header=None, summary=None, options=PAGE_OPTIONS):
@@ -133,8 +157,3 @@ def page(content, title="Results", header=None, summary=None, options=PAGE_OPTIO
            header_str=header_str, summary_str=summary_str, content_str=content_str)
 
     return html_page
-
-
-def write(text, fn=HTML_FILE_NAME):
-    with open(fn, "w") as f:
-        f.write(text)
