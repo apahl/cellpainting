@@ -79,6 +79,7 @@ OVERVIEW_TABLE_HEADER = """
     <td><b>Mol</b></td>
     <td><b>Compound_Id</b></td>
     <td><b>Producer</b></td>
+    <td><b>Pure_Flag</b></td>
     <td><b>Act_Flag</b></td>
     <td><b>Activity</b></td>
     <td><b>Number of<br>Similar References</b></td>
@@ -91,6 +92,7 @@ OVERVIEW_TABLE_ROW = """
     <td><b>$mol_img</b></td>
     <td><b>$Compound_Id</b></td>
     <td><b>$Producer</b></td>
+    <td><b>$Pure_Flag</b></td>
     <td><b>$Act_Flag</b></td>
     <td><b>$Activity</b></td>
     <td><b>$Num_Sim_Ref</b></td>

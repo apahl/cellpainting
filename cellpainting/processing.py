@@ -245,6 +245,14 @@ class DataSet():
         return result
 
 
+    def flag_toxic(self, cutoff=0.55):
+        """Flag data rows of toxic compounds"""
+        result = DataSet()
+        result.data = flag_toxic(self.data, cutoff=cutoff)
+        result.print_log("flag toxic")
+        return result
+
+
     def remove_toxic(self, cutoff=0.55):
         """Remove data rows of toxic compounds"""
         result = DataSet()
@@ -254,11 +262,11 @@ class DataSet():
         return result, toxic
 
 
-    def remove_flagged(self, strict=False, reset_index=True):
+    def remove_impure(self, strict=False, reset_index=True):
         """Remove entries with `Pure_Flag == "Fail"`"""
         result = DataSet()
         flagged = DataSet()
-        result.data, flagged.data = remove_flagged(self.data)
+        result.data, flagged.data = remove_impure(self.data)
         result.print_log("remove flagged", "{:3d} removed".format(flagged.shape[0]))
         return result, flagged
 
@@ -357,6 +365,22 @@ class DataSet():
         result.print_log("relevant parameters", "{:.3f}/{:.3f}/{:.2f}".format(ctrls_mad_rel_min,
                                                                               ctrls_mad_rel_max,
                                                                               times_mad))
+        return result
+
+
+    def correlation_filter_poc(self, cutoff=0.9, method="pearson"):
+        """The correlation removes all highly correlated columns from the dataframe.
+        The function was implemented according to the description of the corresponding
+        KNIME component.
+
+        Parameters:
+            cutoff (float): correlation cutoff
+            method (string): "pearson", "kendall", "spearman" (very slow)
+
+        Returns a new DataFrame with only the non-correlated columns"""
+        result = DataSet()
+        result.data, iterations = correlation_filter_poc(self.data, cutoff=cutoff, method=method)
+        result.print_log("correlation filter", "{:3d} iterations".format(iterations))
         return result
 
 
@@ -565,6 +589,14 @@ def numeric_parameters(df):
     return result
 
 
+def flag_toxic(df, cutoff=0.55):
+    """Flag data rows of toxic compounds"""
+    result = df.copy()
+    median_cell_count_controls = df[df["WellType"] == "Control"]["Count_Cells"].median()
+    result["Toxic"] = (result["Count_Cells"] < median_cell_count_controls * cutoff)
+    return result
+
+
 def remove_toxic(df, cutoff=0.55):
     """Remove data rows of toxic compounds"""
     median_cell_count_controls = df[df["WellType"] == "Control"]["Count_Cells"].median()
@@ -592,7 +624,7 @@ def remove_skipped_echo_direct_transfer(df, fn):
     return result, skipped_wells
 
 
-def remove_flagged(df, strict=False, reset_index=True):
+def remove_impure(df, strict=False, reset_index=True):
     """Remove entries with `Pure_Flag == "Fail"`
     If `strict == True` compound with `Pure_Flag == Warn` are also removed."""
     result = df.copy()
@@ -774,6 +806,59 @@ def relevant_parameters(df, ctrls_mad_rel_min=0.01,
     result = df[keep]
     debug_print("keep", len(keep))
     return result
+
+
+def correlation_filter_poc(df, cutoff=0.9, method="pearson"):
+    """Reduce the parameter set to only uncorrelated parameters. From a set of correlated
+    oarameters only the one with the highest Max(POC) is kept, all others are discarded."""
+    assert method in ["pearson", "kendall", "spearman"], 'method has to be one of ["pearson", "kendall", "spearman"]'
+    assert "WellType" in df.keys()
+
+    # init the list of the uncorrelated parameters, incl. some string param.
+    parameters_uncorr = [p for p in FINAL_PARAMETERS if p in df]
+
+    df_copy = df.copy()
+    median_controls = df_copy[df_copy["WellType"] == "Control"].median()
+    df_copy = df_copy.select_dtypes(include=[np.number])
+
+    iteration = 0
+    while True:
+        cm = df_copy.corr(method=method)
+        correlated = cm[cm > cutoff]
+        ds = correlated.count().sort_values(ascending=False)
+        if ds[0] == 1: break  # no more correlations
+        iteration += 1
+
+        equal_corr = ds[ds == ds[0]]
+        eq_keys = equal_corr.keys()
+        # from all columns with the same number of correlated columns,
+        # find the column with the highest Max(POC)
+        # and keep that preferably
+
+        # keep_it = ((df_copy[eq_keys] / median_controls[eq_keys]).max()
+        #                                                                             .sort_values(ascending=False)
+        #                                                                             .keys()[0])
+        poc = (df_copy[eq_keys] / median_controls[eq_keys])
+        keep_it = (poc.max() - poc.min()).sort_values(ascending=False).keys()[0]
+
+        parameters_uncorr.append(keep_it)
+        debug_print("keep_it", keep_it)
+        debug_print("num_corr.", len(equal_corr))
+
+        # find the parameters actually correlated to `keep_it`
+        # parameters_to_remove = list(cm[keep_it][cm[keep_it] > cutoff].keys())
+        parameters_to_remove = list(correlated[keep_it][correlated[keep_it].notnull()].keys())
+        # The uncorrelated parameter `keep_it` is also in this list and has to be removed from it:
+        # parameters_to_remove.remove(keep_it)
+        debug_print("param_to_rem", parameters_to_remove)
+
+        # remove the correlated parameters:
+        df_copy.drop(parameters_to_remove, axis=1, inplace=True)
+
+    parameters_uncorr.extend(df_copy.keys())
+    parameters_uncorr = list(set(parameters_uncorr))
+    # print("It took {} iterations to remove all correlated parameters.".format(iteration - 1))
+    return df[parameters_uncorr], iteration
 
 
 def correlation_filter(df, cutoff=0.9, method="pearson"):
