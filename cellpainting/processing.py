@@ -60,8 +60,8 @@ except ImportError:
 
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
-                    "Compound_Id", 'Batch_Id', "Producer", "Pure_Flag", "Known_Act", "Trivial_Name",
-                    'WellType', 'Conc_uM', "Activity", "Act_Profile", "Smiles"]
+                    "Compound_Id", 'Batch_Id', "Producer", "Pure_Flag", "Toxic", "Fitness",
+                    "Known_Act", "Trivial_Name", 'WellType', 'Conc_uM', "Activity", "Act_Profile", "Smiles"]
 DROP_FROM_NUMBERS = ['plateColumn', 'plateRow', 'Conc_uM', "Compound_Id"]
 DROP_GLOBAL = ["PathName_CellOutlines", "URL_CellOutlines", 'FileName_CellOutlines',
                'ImageNumber', 'Metadata_Site', 'Metadata_Site_1', 'Metadata_Site_2']
@@ -267,7 +267,7 @@ class DataSet():
         result = DataSet()
         flagged = DataSet()
         result.data, flagged.data = remove_impure(self.data)
-        result.print_log("remove flagged", "{:3d} removed".format(flagged.shape[0]))
+        result.print_log("remove impure", "{:3d} removed".format(flagged.shape[0]))
         return result, flagged
 
 
@@ -594,14 +594,15 @@ def flag_toxic(df, cutoff=0.55):
     result = df.copy()
     median_cell_count_controls = df[df["WellType"] == "Control"]["Count_Cells"].median()
     result["Toxic"] = (result["Count_Cells"] < median_cell_count_controls * cutoff)
+    result["Fitness"] = (100 * (result["Count_Cells"] / median_cell_count_controls)).astype(int)
     return result
 
 
 def remove_toxic(df, cutoff=0.55):
     """Remove data rows of toxic compounds"""
-    median_cell_count_controls = df[df["WellType"] == "Control"]["Count_Cells"].median()
-    result = df[df["Count_Cells"] >= median_cell_count_controls * cutoff]
-    toxic = df[df["Count_Cells"] < median_cell_count_controls * cutoff]
+    flagged = flag_toxic(df, cutoff=cutoff)
+    result = flagged[~flagged["Toxic"]]
+    toxic = flagged[flagged["Toxic"]]
     return result, toxic
 
 
@@ -725,6 +726,7 @@ def activity_profile(df, mad_mult=3.5, parameters=ACT_PROF_PARAMETERS, only_fina
     are kept in the output_table.
 
     Returns a new Pandas DataFrame."""
+    decimals = {"Activity": 1}
     result = df.copy()
 
     if parameters is None:  # choose all numeric parameters
@@ -753,6 +755,7 @@ def activity_profile(df, mad_mult=3.5, parameters=ACT_PROF_PARAMETERS, only_fina
         for k in result.keys():
             if k not in FINAL_PARAMETERS:
                 result.drop(k, axis=1, inplace=True)
+    result = result.round(decimals)
     return result
 
 
@@ -832,12 +835,9 @@ def correlation_filter_poc(df, cutoff=0.9, method="pearson"):
         equal_corr = ds[ds == ds[0]]
         eq_keys = equal_corr.keys()
         # from all columns with the same number of correlated columns,
-        # find the column with the highest Max(POC)
+        # find the column with the highest POC range
         # and keep that preferably
 
-        # keep_it = ((df_copy[eq_keys] / median_controls[eq_keys]).max()
-        #                                                                             .sort_values(ascending=False)
-        #                                                                             .keys()[0])
         poc = (df_copy[eq_keys] / median_controls[eq_keys])
         keep_it = (poc.max() - poc.min()).sort_values(ascending=False).keys()[0]
 
@@ -846,10 +846,7 @@ def correlation_filter_poc(df, cutoff=0.9, method="pearson"):
         debug_print("num_corr.", len(equal_corr))
 
         # find the parameters actually correlated to `keep_it`
-        # parameters_to_remove = list(cm[keep_it][cm[keep_it] > cutoff].keys())
         parameters_to_remove = list(correlated[keep_it][correlated[keep_it].notnull()].keys())
-        # The uncorrelated parameter `keep_it` is also in this list and has to be removed from it:
-        # parameters_to_remove.remove(keep_it)
         debug_print("param_to_rem", parameters_to_remove)
 
         # remove the correlated parameters:
@@ -898,10 +895,8 @@ def correlation_filter(df, cutoff=0.9, method="pearson"):
         debug_print("num_corr.", num_correlated)
 
         # find the parameters actually correlated to `keep_it`
-        # parameters_to_remove = list(cm[keep_it][cm[keep_it] > cutoff].keys())
         parameters_to_remove = list(correlated[keep_it][correlated[keep_it].notnull()].keys())
         # The uncorrelated parameter `keep_it` is also in this list and has to be removed from it:
-        # parameters_to_remove.remove(keep_it)
         debug_print("param_to_rem", parameters_to_remove)
 
         # remove the correlated parameters:
