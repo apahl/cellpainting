@@ -113,6 +113,16 @@ def isnumber(x):
         return False
 
 
+def convert_bool(dict, dkey, true="Yes", false="No", default="n.d."):
+    if dkey in dict:
+        if dict[dkey]:
+            dict[dkey] = true
+        else:
+            dict[dkey] = false
+    else:
+        dict[dkey] = default
+
+
 def b64_img(mol, size=300):
     img_file = IO()
     img = autocrop(Draw.MolToImage(mol, size=(size, size)))
@@ -138,7 +148,7 @@ def write(text, fn):
 def write_page(page, title="Report", fn="index.html"):
     t = Template(cprt.HTML_INTRO + page + cprt.HTML_EXTRO)
     result = t.substitute(title=title)
-    write(result)
+    write(result, fn=fn)
 
 
 def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None):
@@ -154,10 +164,14 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None):
         mol = mol_from_smiles(rec.get("Smiles", "C"))
         rec["mol_img"] = mol_img_tag(mol)
         rec["idx"] = idx + 1
+        convert_bool(rec, "Toxic")
+
         if rec["Activity"] < ACT_CUTOFF_PERC:
+            rec["Act_Flag"] = "inactive"
             rec["Num_Sim_Ref"] = ""
             rec["Link"] = ""
         else:
+            rec["Act_Flag"] = "active"
             act_profile = rec["Act_Profile"]
             sim_refs = cpp.find_similar(df_refs, act_profile, cutoff=cutoff)
             if sim_refs.shape[0] == 0:
@@ -165,7 +179,7 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None):
                 rec["Link"] = ""
             else:
                 rec["Num_Sim_Ref"] = str(sim_refs.shape[0])
-                rec["Link"] = '<a href="details/$Compound_Id">Detailed<br>Report</a>'
+                rec["Link"] = '<a href="details/{}">Detailed<br>Report</a>'.format(rec["Compound_Id"])
                 if detailed_cpds is not None:
                     detailed_cpds[rec["Compound_Id"]] = []
                     ref_dict = {}
@@ -194,4 +208,4 @@ def full_report(df, df_refs=None, dirname="report", plate=None, cutoff=0.6):
         header += "<h3>Plate {}</h3>\n".format(plate)
     header += "<h3>({})</h3>\n".format(time.strftime("%d-%m-%Y %H:%M", time.localtime()))
     overview = header + overview_report(df, df_refs, cutoff=cutoff, detailed_cpds=detailed_cpds)
-    write_page(overview, title=title)
+    write_page(overview, title=title, fn="report/index.html")

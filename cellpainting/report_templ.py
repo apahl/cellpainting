@@ -23,8 +23,17 @@ TABLE_OPTIONS = {"cellspacing": "1", "cellpadding": "1", "border": "1",
                  "align": "", "height": "60px", "summary": "Table", }  # "width": "800px",
 PAGE_OPTIONS = {"icon": "icons/benzene.png"}
 
-CSS = """<style>
-  body{
+CSS = """
+<style>
+table {
+  border-collapse:collapse;
+  border-width:thin;
+  border-style:solid;
+  border: none;
+  background-color: #FFFFFF;
+  text-align: left;
+}
+body{
   background-color: #FFFFFF;
   font-family: freesans, arial, verdana, sans-serif;
 }
@@ -33,6 +42,7 @@ th {
   border-width: thin;
   border-style: solid;
   border-color: black;
+  background-color: #94CAEF;
   text-align: left;
   font-weight: bold;
 }
@@ -43,16 +53,8 @@ td {
   border-color:black;
   padding: 5px;
 }
-table {
-  border-collapse:collapse;
-  border-width:thin;
-  border-style:solid;
-  //border-color:black;
-  border: none;
-  background-color: #FFFFFF;
-  text-align: left;
-}
-</style>"""
+</style>
+"""
 
 TABLE_INTRO = """<table id="table" width="" cellspacing="1" cellpadding="1" border="1" align="center" height="60" summary="">
 </tbody>"""
@@ -79,24 +81,28 @@ OVERVIEW_TABLE_HEADER = """
     <td><b>Mol</b></td>
     <td><b>Compound_Id</b></td>
     <td><b>Producer</b></td>
-    <td><b>Pure_Flag</b></td>
-    <td><b>Act_Flag</b></td>
-    <td><b>Activity</b></td>
+    <td><b>Activity<br>Flag</b></td>
+    <td><b>Activity [%]</b></td>
+    <td><b>Purity<br>Flag</b></td>
+    <td><b>Toxic</b></td>
+    <td><b>Cell<br>Fitness</b></td>
     <td><b>Number of<br>Similar References</b></td>
     <td><b>Link to<br>Detailed Report</b></td>
 </tr>"""
 
 OVERVIEW_TABLE_ROW = """
 <tr>
-    <td><b>$idx</b></td>
-    <td><b>$mol_img</b></td>
-    <td><b>$Compound_Id</b></td>
-    <td><b>$Producer</b></td>
-    <td><b>$Pure_Flag</b></td>
-    <td><b>$Act_Flag</b></td>
-    <td><b>$Activity</b></td>
-    <td><b>$Num_Sim_Ref</b></td>
-    <td><b>$Link</b></td>
+    <td>$idx</td>
+    <td>$mol_img</td>
+    <td>$Compound_Id</td>
+    <td>$Producer</td>
+    <td>$Act_Flag</td>
+    <td>$Activity</td>
+    <td>$Pure_Flag</td>
+    <td>$Toxic</td>
+    <td>$Fitness</td>
+    <td>$Num_Sim_Ref</td>
+    <td>$Link</td>
 </tr>"""
 
 
