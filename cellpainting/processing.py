@@ -600,7 +600,10 @@ def flag_toxic(df, cutoff=0.55):
 
 def remove_toxic(df, cutoff=0.55):
     """Remove data rows of toxic compounds"""
-    flagged = flag_toxic(df, cutoff=cutoff)
+    if "Toxic" not in df.keys():
+        flagged = flag_toxic(df, cutoff=cutoff)
+    else:
+        flagged = df.copy()
     result = flagged[~flagged["Toxic"]]
     toxic = flagged[flagged["Toxic"]]
     return result, toxic
@@ -911,12 +914,14 @@ def correlation_filter(df, cutoff=0.9, method="pearson"):
 def find_similar(df, act_profile, cutoff=0.6, max_num=3):
     """Filter the dataframe for activity profiles similar to the given one.
     `cutoff` gives the similarity threshold, default is 0.9."""
+    decimals = {"Similarity": 3}
     result = df.copy()
     result["Similarity"] = result["Act_Profile"].apply(lambda x: cpt.profile_sim(x,
                                                                                  act_profile))
     result = result[result["Similarity"] >= cutoff]
     result.drop("Act_Profile", axis=1, inplace=True)
     result = result.sort_values("Similarity", ascending=False).head(max_num)
+    result = result.round(decimals)
     return result
 
 

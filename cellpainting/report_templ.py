@@ -18,6 +18,11 @@ Out[4]: 'Axel, this is a Test for Templates.'
 
 from string import Template
 
+
+class PreTemplate(Template):
+    delimiter = "§"
+
+
 HTML_FILE_NAME = "report.html"
 TABLE_OPTIONS = {"cellspacing": "1", "cellpadding": "1", "border": "1",
                  "align": "", "height": "60px", "summary": "Table", }  # "width": "800px",
@@ -25,6 +30,11 @@ PAGE_OPTIONS = {"icon": "icons/benzene.png"}
 
 CSS = """
 <style>
+body {
+  text-align: left;
+  background-color: #FFFFFF;
+  font-family: freesans, arial, verdana, sans-serif;
+}
 table {
   border-collapse:collapse;
   border-width:thin;
@@ -32,10 +42,6 @@ table {
   border: none;
   background-color: #FFFFFF;
   text-align: left;
-}
-body{
-  background-color: #FFFFFF;
-  font-family: freesans, arial, verdana, sans-serif;
 }
 th {
   border-collapse: collapse;
@@ -45,6 +51,7 @@ th {
   background-color: #94CAEF;
   text-align: left;
   font-weight: bold;
+  padding: 5px;
 }
 td {
   border-collapse:collapse;
@@ -53,115 +60,162 @@ td {
   border-color:black;
   padding: 5px;
 }
-</style>
-"""
+</style>"""
 
-TABLE_INTRO = """<table id="table" width="" cellspacing="1" cellpadding="1" border="1" align="center" height="60" summary="">
-</tbody>"""
-TABLE_EXTRO = """</tbody>
+TABLE_INTRO = """
+<table id="table" width="" cellspacing="1" cellpadding="1" border="1" height="60" summary="">"""
+TABLE_EXTRO = """
 </table>"""
-HTML_INTRO = """<!DOCTYPE html>
+HTML_INTRO = """
+<!DOCTYPE html>
 <html>
 <head>
   <title>$title</title>
   <meta charset="UTF-8">
-  $css
+  §css
 </head>
-<body>
-"""
-t = Template(HTML_INTRO)
-HTML_INTRO = t.substitute(css=CSS, title="$title")  # outwitting the formatter...
+<body>"""
+t = PreTemplate(HTML_INTRO)
+HTML_INTRO = t.substitute(css=CSS)
+
 HTML_EXTRO = """
 </body>
 </html>"""
 
 OVERVIEW_TABLE_HEADER = """
 <tr>
-    <td><b>Idx</b></td>
-    <td><b>Mol</b></td>
-    <td><b>Compound_Id</b></td>
-    <td><b>Producer</b></td>
-    <td><b>Activity<br>Flag</b></td>
-    <td><b>Activity [%]</b></td>
-    <td><b>Purity<br>Flag</b></td>
-    <td><b>Toxic</b></td>
-    <td><b>Cell<br>Fitness</b></td>
-    <td><b>Number of<br>Similar References</b></td>
-    <td><b>Link to<br>Detailed Report</b></td>
+    <th>Idx</th>
+    <th>Mol</th>
+    <th>Compound_Id</th>
+    <th>Producer</th>
+    <th>Activity<br>Flag</th>
+    <th>Activity [%]</th>
+    <th>Purity<br>Flag</th>
+    <th>Toxic</th>
+    <th>Cell<br>Viability [%]</th>
+    <th>Highest Similarity<br>to a Reference [%]</th>
+    <th>Link to<br>Detailed Report</th>
 </tr>"""
 
 OVERVIEW_TABLE_ROW = """
 <tr>
     <td>$idx</td>
     <td>$mol_img</td>
-    <td>$Compound_Id</td>
-    <td>$Producer</td>
-    <td>$Act_Flag</td>
-    <td>$Activity</td>
-    <td>$Pure_Flag</td>
-    <td>$Toxic</td>
-    <td>$Fitness</td>
-    <td>$Num_Sim_Ref</td>
+    <td title="Compound_Id">$Compound_Id</td>
+    <td title="Producer">$Producer</td>
+    <td title="Activity\nFlag">$Act_Flag</td>
+    <td title="Activity [%]">$Activity</td>
+    <td title="Purity\nFlag">$Pure_Flag</td>
+    <td title="Toxic">$Toxic</td>
+    <td title="Cell\nViability [%]">$Fitness</td>
+    <td title="Highest Similarity\nto a Reference [%]">$Max_Sim</td>
     <td>$Link</td>
 </tr>"""
 
+REF_TABLE_HEADER = """
+<tr>
+    <th>Idx</th>
+    <th>Mol</th>
+    <th>Compound_Id</th>
+    <th>Similarity [%]</th>
+    <th>Trivial Name</th>
+    <th>Known Activity</th>
+</tr>"""
 
+REF_TABLE_ROW = """
+<tr>
+    <td>$idx</td>
+    <td>$mol_img</td>
+    <td>$Compound_Id</td>
+    <td>$Similarity</td>
+    <td>$Trivial_Name</td>
+    <td>$Known_Act</td>
+</tr>"""
 
-def page(content, title="Results", header=None, summary=None, options=PAGE_OPTIONS):
-    """create a full HTML page from a list of stubs below
-    options dict:
-    css:     list of CSS style file paths to include.
-    scripts: list of javascript library file paths to include.
-    icon: path to icon image
-    returns HTML page as STRING !!!"""
+INC_PARM_TABLE_HEADER = """
+<tr>
+    <th>Idx</th>
+    <th>Increased Parameter</th>
+</tr>"""
 
-    # override the title if there is a title in <options>
-    if "title" in options and len(options["title"]) > 2:
-        title = options["title"]
+DEC_PARM_TABLE_HEADER = """
+<tr>
+    <th>Idx</th>
+    <th>Decreased Parameter</th>
+</tr>"""
 
-    if "icon" in options and len(options["icon"]) > 2:
-        icon_str = '<link rel="shortcut icon" href="{}" />'.format(options["icon"])
-    else:
-        icon_str = ""
+PARM_TABLE_ROW = """
+<tr>
+    <td>$idx</td>
+    <td>$Parameter</td>
+</tr>"""
 
-    if "css" in options and options["css"]:
-        css = options["css"]
-        if not isinstance(css, list):
-            css = [css]
+DETAILS_TEMPL = """
+<p style="float: right;">$mol_img</p>
+<h1>Detailed Report</h1>
+<h2>Compound Id $Compound_Id</h2>
+<p>Producer: $Producer</p>
+<p>Activity: $Activity %</p>
+<br>
+<br>
+<h3>Similar References</h3>
+§TABLE_INTRO
+§REF_TABLE_HEADER
+$Ref_Table
+§TABLE_EXTRO
+<p></p>
+<br>
+<br>
+<h3>Parameters Increased Compared to Control</h3>
+§TABLE_INTRO
+§INC_PARM_TABLE_HEADER
+$Inc_Parm_Table
+§TABLE_EXTRO
+<p></p>
+<br>
+<br>
+<h3>Parameters Decreased Compared to Control</h3>
+§TABLE_INTRO
+§DEC_PARM_TABLE_HEADER
+$Dec_Parm_Table
+§TABLE_EXTRO
+<p>($Date)</p>"""
+d = {"TABLE_INTRO": TABLE_INTRO, "TABLE_EXTRO": TABLE_EXTRO,
+     "REF_TABLE_HEADER": REF_TABLE_HEADER, "INC_PARM_TABLE_HEADER": INC_PARM_TABLE_HEADER,
+     "DEC_PARM_TABLE_HEADER": DEC_PARM_TABLE_HEADER}
+t = PreTemplate(DETAILS_TEMPL)
+DETAILS_TEMPL = t.substitute(d)
 
-        css_str = "".join(['  <link rel="stylesheet" type="text/css" href="{}">\n'.format(file_name) for file_name in css])
-    else:
-        # minimal inline CSS
-        css_str = CSS
-    if header:
-        header_str = "<h2>{}</h2>".format(header)
-    else:
-        header_str = ""
-    if summary:
-        summary_str = "<p>{}</p>".format(summary)
-    else:
-        summary_str = ""
-    if isinstance(content, list):
-        content_str = "".join(content)
-    else:
-        content_str = content
+DETAILS_TEMPL_NO_SIM_REFS = """
+<p style="float: right;">$mol_img</p>
+<h1>Detailed Report</h1>
+<h2>Compound Id $Compound_Id</h2>
+<p>Producer: $Producer</p>
+<p>Activity: $Activity %</p>
+<br>
+<br>
+<h3>Similar References</h3>
+No Similar References were found.
+<p></p>
+<br>
+<br>
+<h3>Parameters Increased Compared to Control</h3>
+§TABLE_INTRO
+§INC_PARM_TABLE_HEADER
+$Inc_Parm_Table
+§TABLE_EXTRO
+<p></p>
+<br>
+<br>
+<h3>Parameters Decreased Compared to Control</h3>
+§TABLE_INTRO
+§DEC_PARM_TABLE_HEADER
+$Dec_Parm_Table
+§TABLE_EXTRO
 
-
-    html_page = """<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>{title}</title>
-  {icon_str}
-{css_str}
-</head>
-<body>
-{header_str}
-{summary_str}
-{content_str}
-</body>
-</html>
-""".format(title=title, icon_str=icon_str, css_str=css_str,
-           header_str=header_str, summary_str=summary_str, content_str=content_str)
-
-    return html_page
+<p>($Date)</p>"""
+d = {"TABLE_INTRO": TABLE_INTRO, "TABLE_EXTRO": TABLE_EXTRO,
+     "INC_PARM_TABLE_HEADER": INC_PARM_TABLE_HEADER,
+     "DEC_PARM_TABLE_HEADER": DEC_PARM_TABLE_HEADER}
+t = PreTemplate(DETAILS_TEMPL_NO_SIM_REFS)
+DETAILS_TEMPL_NO_SIM_REFS = t.substitute(d)

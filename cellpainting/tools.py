@@ -18,6 +18,8 @@ import pandas as pd
 
 from rdkit_ipynb_tools import pipeline as ppl
 
+from .config import ACT_PROF_PARAMETERS
+
 ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P",
         "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF"]
 STRUCT = "/home/pahl/comas/share/export_data_b64.csv.gz"
@@ -146,3 +148,13 @@ def check_df(df, fn):
     elif isinstance(df, str):
         df = pd.read_csv(df, sep="\t")
     return df
+
+
+def parameters_from_act_profile_by_val(act_prof, val, parameters=ACT_PROF_PARAMETERS):
+    result = []
+    if not isinstance(val, str):
+        val = str(val)
+    for idx, act in enumerate(act_prof):
+        if act == val:
+            result.append(parameters[idx])
+    return result

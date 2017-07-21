@@ -24,10 +24,12 @@ from PIL import Image, ImageChops
 from . import tools as cpt
 from . import report_templ as cprt
 from . import processing as cpp
-from .config import ACT_CUTOFF_PERC
+from .config import ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC
 
 Draw.DrawingOptions.atomLabelFontFace = "DejaVu Sans"
 Draw.DrawingOptions.atomLabelFontSize = 18
+
+from IPython.core.display import HTML
 
 try:
     from misc_tools import apl_tools, comas_config
@@ -152,49 +154,112 @@ def write_page(page, title="Report", fn="index.html"):
 
 
 def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None):
-    """detailed_cpds = {Compound_Id: [{"Sim_Ref_Id": Sim_Ref_Id with highest Similarity, "Trivial_Name": ...,
+    """detailed_cpds = {Compound_Id: [{"Compound_Id": Sim_Ref_Id with highest Similarity, "Trivial_Name": ...,
     "Similarity": ..., "Known_Act": ..., "Smiles": ...},
-    {{"Sim_Ref_Id": Sim_Ref_Id with next highest Similarity, "Tr...}]}"""
+    {{"Compound_Id": Sim_Ref_Id with next highest Similarity, "Tr...}]}"""
     if isinstance(df, cpp.DataSet):
         df = df.data
     df_refs = cpt.check_df(df_refs, REFERENCES)
     report = [cprt.TABLE_INTRO, cprt.OVERVIEW_TABLE_HEADER]
     row_templ = Template(cprt.OVERVIEW_TABLE_ROW)
-    for idx, rec in df.iterrows():
+    idx = 0
+    for _, rec in df.iterrows():
+        idx += 1
         mol = mol_from_smiles(rec.get("Smiles", "C"))
         rec["mol_img"] = mol_img_tag(mol)
-        rec["idx"] = idx + 1
+        rec["idx"] = idx
         convert_bool(rec, "Toxic")
 
         if rec["Activity"] < ACT_CUTOFF_PERC:
             rec["Act_Flag"] = "inactive"
-            rec["Num_Sim_Ref"] = ""
+            # rec["Num_Sim_Ref"] = ""
+            rec["Max_Sim"] = ""
             rec["Link"] = ""
         else:
             rec["Act_Flag"] = "active"
             act_profile = rec["Act_Profile"]
-            sim_refs = cpp.find_similar(df_refs, act_profile, cutoff=cutoff)
+            sim_refs = cpp.find_similar(df_refs, act_profile, cutoff=cutoff, max_num=5)
+            sim_refs = sim_refs.fillna("&mdash;")
             if sim_refs.shape[0] == 0:
-                rec["Num_Sim_Ref"] = "None"
-                rec["Link"] = ""
+                # rec["Num_Sim_Ref"] = "None"
+                rec["Max_Sim"] = "< {}".format(cutoff * 100)
             else:
-                rec["Num_Sim_Ref"] = str(sim_refs.shape[0])
-                rec["Link"] = '<a href="details/{}">Detailed<br>Report</a>'.format(rec["Compound_Id"])
-                if detailed_cpds is not None:
-                    detailed_cpds[rec["Compound_Id"]] = []
+                # rec["Num_Sim_Ref"] = str(sim_refs.shape[0])
+                rec["Max_Sim"] = str(sim_refs["Similarity"].max() * 100)
+            rec["Link"] = '<a href="details/{}.html">Detailed<br>Report</a>'.format(rec["Compound_Id"])
+            if detailed_cpds is not None:
+                detailed_cpds[rec["Compound_Id"]] = []
+                for _, ref in sim_refs.iterrows():
                     ref_dict = {}
-                    for _, ref in sim_refs.iterrows():
-                        ref_dict["Sim_Ref_Id"] = ref["Compound_Id"]
-                        ref_dict["Smiles"] = ref["Smiles"]
-                        ref_dict["Trivial_Name"] = ref["Trivial_Name"]
-                        ref_dict["Similarity"] = ref["Similarity"]
-                        ref_dict["Known_Act"] = ref["Known_Act"]
+                    ref_dict["Compound_Id"] = ref["Compound_Id"]
+                    ref_dict["Smiles"] = ref["Smiles"]
+                    ref_dict["Trivial_Name"] = ref["Trivial_Name"]
+                    ref_dict["Similarity"] = ref["Similarity"]
+                    ref_dict["Known_Act"] = ref["Known_Act"]
+                    detailed_cpds[rec["Compound_Id"]].append(ref_dict)
         report.append(row_templ.substitute(rec))
     report.append(cprt.TABLE_EXTRO)
     return "\n".join(report)
 
 
+def sim_ref_table(sim_refs):
+    table = []
+    templ = Template(cprt.REF_TABLE_ROW)
+    for idx, sim_ref in enumerate(sim_refs, 1):
+        rec = sim_ref.copy()
+        mol = mol_from_smiles(rec.get("Smiles", "C"))
+        rec["Similarity"] *= 100
+        rec["mol_img"] = mol_img_tag(mol)
+        rec["idx"] = idx
+        row = templ.substitute(rec)
+        table.append(row)
+    return "\n".join(table)
+
+
+def changed_parameters_table(act_prof, val, parameters=ACT_PROF_PARAMETERS):
+    changed = cpt.parameters_from_act_profile_by_val(act_prof, val, parameters=parameters)
+    table = []
+    templ = Template(cprt.PARM_TABLE_ROW)
+    for idx, p in enumerate(changed, 1):
+        rec = {
+            "idx": idx,
+            "Parameter": p[5:]
+        }
+        row = templ.substitute(rec)
+        table.append(row)
+    return "\n".join(table)
+
+
+def detailed_report(rec, sim_refs):
+    date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
+    act_prof = rec["Act_Profile"]
+    inc_parm = changed_parameters_table(act_prof, "2")
+    dec_parm = changed_parameters_table(act_prof, "0")
+    mol = mol_from_smiles(rec.get("Smiles", "C"))
+
+    templ_dict = {
+        "Compound_Id": rec["Compound_Id"],
+        "Date": date,
+        "Producer": rec["Producer"],
+        "Activity": rec["Activity"],
+        "mol_img": mol_img_tag(mol),
+        "Inc_Parm_Table": inc_parm,
+        "Dec_Parm_Table": dec_parm
+    }
+    if len(sim_refs) > 0:
+        ref_tbl = sim_ref_table(sim_refs)
+        templ_dict["Ref_Table"] = ref_tbl
+        t = Template(cprt.DETAILS_TEMPL)
+    else:
+        t = Template(cprt.DETAILS_TEMPL_NO_SIM_REFS)
+
+    report = t.substitute(templ_dict)
+    return report
+
+
 def full_report(df, df_refs=None, dirname="report", plate=None, cutoff=0.6):
+    overview_fn = op.join(dirname, "index.html")
+    date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
     cpt.create_dirs(op.join(dirname, "details"))
     if isinstance(df, cpp.DataSet):
         df = df.data
@@ -206,6 +271,18 @@ def full_report(df, df_refs=None, dirname="report", plate=None, cutoff=0.6):
     if plate is not None:
         title = plate
         header += "<h3>Plate {}</h3>\n".format(plate)
-    header += "<h3>({})</h3>\n".format(time.strftime("%d-%m-%Y %H:%M", time.localtime()))
+    header += "<p>({})</p>\n".format(date)
     overview = header + overview_report(df, df_refs, cutoff=cutoff, detailed_cpds=detailed_cpds)
-    write_page(overview, title=title, fn="report/index.html")
+    write_page(overview, title=title, fn=overview_fn)
+    # print(detailed_cpds)
+    print("* creating detailed reports...")
+    df_detailed = df[df["Compound_Id"].isin(detailed_cpds)]
+    for _, rec in df_detailed.iterrows():
+        cpd_id = rec["Compound_Id"]
+        fn = op.join(dirname, "details", "{}.html".format(cpd_id))
+        title = "{} Details".format(cpd_id)
+        sim_refs = detailed_cpds[cpd_id]
+        details = detailed_report(rec, sim_refs)
+        write_page(details, title=title, fn=fn)
+
+    return HTML('<a href="{}">{}</a>'.format(overview_fn, "Overview"))
