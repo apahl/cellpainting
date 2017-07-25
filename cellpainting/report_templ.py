@@ -7,20 +7,27 @@ Report Templates
 
 *Created on Thu Jun  8 14:40 2017 by A. Pahl*
 
-Templates for the HTML Reports.
+Templates for the HTML Reports."""
 
+import base64
+import os.path as op
 from string import Template
-In [2]: report_all = Template("$name, this is a $what for Templates.")
-In [3]: tmap = {"name": "Axel", "what": "Test"}
-In [4]: report_all.substitute(tmap)
-Out[4]: 'Axel, this is a Test for Templates.'
-"""
+from io import BytesIO as IO
 
-from string import Template
+from PIL import Image
 
 
 class PreTemplate(Template):
     delimiter = "§"
+
+
+def b64_img(im, format="JPEG"):
+    img_file = IO()
+    im.save(img_file, format=format)
+    b64 = base64.b64encode(img_file.getvalue())
+    b64 = b64.decode()
+    img_file.close()
+    return b64
 
 
 HTML_FILE_NAME = "report.html"
@@ -78,6 +85,11 @@ td.noborder {
   padding: 5px;
 }
 </style>"""
+
+lpath = op.join(op.dirname(__file__), "../res/Comas3.png")
+logo = Image.open(lpath)
+LOGO = '<img style="float: right; width: 300px;" src="data:image/png;base64,{}" alt="Cell"/>'
+LOGO = LOGO.format(b64_img(logo, format="PNG"))
 
 TABLE_INTRO = """
 <table id="table" width="" cellspacing="1" cellpadding="1" border="1" height="60" summary="">"""
@@ -153,13 +165,13 @@ IMAGES_TABLE = """
 <tr>
     <th></th>
     <th>Mitochondria</th>
-    <th>Golgi / <br>Cell Membrane / <br>Cytoskeleton</th>
+    <th>Golgi / Cell <br>Membrane / Cytoskeleton</th>
     <th>Cytoplasmic RNA / <br>Nucleoli</th>
     <th>Endoplasmatic<br>Reticulum</th>
     <th>Nuclei</th>
 </tr>
 <tr>
-    <td>C<br>o<br>m<br>p<br>o<br>u<br>n<br>d</td>
+    <td align="center">C<br>o<br>m<br>p<br>o<br>u<br>n<br>d</td>
     <td>$Img_1_Cpd</td>
     <td>$Img_2_Cpd</td>
     <td>$Img_3_Cpd</td>
@@ -167,7 +179,7 @@ IMAGES_TABLE = """
     <td>$Img_5_Cpd</td>
 </tr>
 <tr>
-    <td>C<br>o<br>n<br>t<br>r<br>o<br>l</td>
+    <td align="center">C<br>o<br>n<br>t<br>r<br>o<br>l</td>
     <td>$Img_1_Ctrl</td>
     <td>$Img_2_Ctrl</td>
     <td>$Img_3_Ctrl</td>
@@ -194,14 +206,20 @@ PARM_TABLE_ROW = """
 </tr>"""
 
 DETAILS_TEMPL = """
-<p style="float: right;">$mol_img</p>
+§LOGO
+<div>
+<div style="float: left; width: 400px;">
 <h1>Detailed Report</h1>
 <h2>Compound Id $Compound_Id</h2>
 §TABLE_INTRO
 <tr><td class="noborder">Producer:</td><td class="noborder">$Producer</td></tr>
 <tr><td class="noborder">Activity:</td><td class="noborder">$Activity %</td></tr>
+<tr><td class="noborder">Purity Flag:</td><td class="noborder">$Pure_Flag</td></tr>
 <tr><td class="noborder">Cell Viability:</td><td class="noborder">$Fitness %</td></tr>
 §TABLE_EXTRO
+</div>
+<p><br><br>$mol_img</p>
+</div>
 <br>
 <br>
 <h3>Similar References</h3>
@@ -231,7 +249,7 @@ $Dec_Parm_Table
 §TABLE_EXTRO
 <p>($Date)</p>"""
 d = {"TABLE_INTRO": TABLE_INTRO, "TABLE_EXTRO": TABLE_EXTRO,
-     "IMAGES_TABLE": IMAGES_TABLE,
+     "IMAGES_TABLE": IMAGES_TABLE, "LOGO": LOGO,
      "INC_PARM_TABLE_HEADER": INC_PARM_TABLE_HEADER,
      "DEC_PARM_TABLE_HEADER": DEC_PARM_TABLE_HEADER}
 t = PreTemplate(DETAILS_TEMPL)

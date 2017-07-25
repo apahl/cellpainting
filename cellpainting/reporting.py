@@ -131,7 +131,7 @@ def convert_bool(dict, dkey, true="Yes", false="No", default="n.d."):
 
 
 def load_image(path, well, channel):
-    image_fn = "{}/{}_w{}.png".format(path, well, channel)
+    image_fn = "{}/{}_w{}.jpg".format(path, well, channel)
     im = Image.open(image_fn)
     return im
 
@@ -146,22 +146,31 @@ def b64_mol(mol, size=300):
     return b64
 
 
-def b64_img(im, size=200):
+def b64_img(im, format="JPEG"):
     img_file = IO()
-    im.save(img_file, format='PNG')
+    im.save(img_file, format=format)
     b64 = base64.b64encode(img_file.getvalue())
     b64 = b64.decode()
     img_file.close()
     return b64
 
 
-def mol_img_tag(mol):
-    img_tag = '<img src="data:image/png;base64,{}" alt="Mol"/>'.format(b64_mol(mol))
+def mol_img_tag(mol, style=None):
+    if style is None:
+        style = ""
+    else:
+        style = """style='{}' """.format(style)
+    img_tag = '<img {}src="data:image/png;base64,{}" alt="Mol"/>'.format(style, b64_mol(mol))
     return img_tag
 
 
-def img_tag(im):
-    img_tag = '<img src="data:image/png;base64,{}" alt="Cell"/>'.format(b64_img(im))
+def img_tag(im, format="jpeg", style=None):
+    if style is None:
+        style = ""
+    else:
+        style = """style='{}' """.format(style)
+    b = b64_img(im, format=format)
+    img_tag = '<img {}src="data:image/{};base64,{}" alt="Cell"/>'.format(style, format.lower(), b)
     return img_tag
 
 
@@ -170,7 +179,7 @@ def load_control_images(src_dir):
     ctrl_images = {}
     for ch in range(1, 6):
         im = load_image(image_dir, "H11", ch)
-        ctrl_images[ch] = img_tag(im)
+        ctrl_images[ch] = img_tag(im, style='width: 250px;')
     return ctrl_images
 
 
@@ -240,9 +249,10 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
         mol = mol_from_smiles(rec.get("Smiles", "C"))
         rec["mol_img"] = mol_img_tag(mol)
         rec["idx"] = idx
+        if "Pure_Flag" not in rec:
+            rec["Pure_Flag"] = "n.d."
         assign_colors(rec)
         convert_bool(rec, "Toxic")
-
 
         if rec["Activity"] < ACT_CUTOFF_PERC:
             rec["Act_Flag"] = "inactive"
@@ -321,6 +331,8 @@ def detailed_report(rec, sim_refs, src_dir, ctrl_images):
     inc_parm = changed_parameters_table(act_prof, "2")
     dec_parm = changed_parameters_table(act_prof, "0")
     mol = mol_from_smiles(rec.get("Smiles", "C"))
+    if "Pure_Flag" not in rec:
+        rec["Pure_Flag"] = "n.d."
 
     templ_dict = {
         "Compound_Id": rec["Compound_Id"],
@@ -328,14 +340,15 @@ def detailed_report(rec, sim_refs, src_dir, ctrl_images):
         "Producer": rec["Producer"],
         "Activity": rec["Activity"],
         "Fitness": rec["Fitness"],
-        "mol_img": mol_img_tag(mol),
+        "Pure_Flag": rec["Pure_Flag"],
+        "mol_img": mol_img_tag(mol, style='border:1px solid #000000; padding: 10px;'),
         "Inc_Parm_Table": inc_parm,
         "Dec_Parm_Table": dec_parm,
     }
     well = rec["Metadata_Well"]
     for ch in range(1, 6):
         im = load_image(image_dir, well, ch)
-        templ_dict["Img_{}_Cpd".format(ch)] = img_tag(im)
+        templ_dict["Img_{}_Cpd".format(ch)] = img_tag(im, style='width: 250px;')
         templ_dict["Img_{}_Ctrl".format(ch)] = ctrl_images[ch]
     if len(sim_refs) > 0:
         ref_tbl = sim_ref_table(sim_refs)
@@ -348,16 +361,16 @@ def detailed_report(rec, sim_refs, src_dir, ctrl_images):
     return report
 
 
-def full_report(df, src_dir, df_refs=None, dirname="report", plate=None, cutoff=0.6, highlight=False):
-    overview_fn = op.join(dirname, "index.html")
+def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cutoff=0.6, highlight=False):
+    overview_fn = op.join(report_name, "index.html")
     date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
-    cpt.create_dirs(op.join(dirname, "details"))
+    cpt.create_dirs(op.join(report_name, "details"))
     if isinstance(df, cpp.DataSet):
         df = df.data
     df_refs = cpt.check_df(df_refs, REFERENCES)
     detailed_cpds = {}
     print("* creating overview...")
-    header = "<h2>Cell Painting Overview Report</h2>\n"
+    header = "{}\n<h2>Cell Painting Overview Report</h2>\n".format(cprt.LOGO)
     title = "Overview"
     if plate is not None:
         title = plate
@@ -374,7 +387,7 @@ def full_report(df, src_dir, df_refs=None, dirname="report", plate=None, cutoff=
     df_detailed = df[df["Compound_Id"].isin(detailed_cpds)]
     for _, rec in df_detailed.iterrows():
         cpd_id = rec["Compound_Id"]
-        fn = op.join(dirname, "details", "{}.html".format(cpd_id))
+        fn = op.join(report_name, "details", "{}.html".format(cpd_id))
         title = "{} Details".format(cpd_id)
         sim_refs = detailed_cpds[cpd_id]
         details = detailed_report(rec, sim_refs, src_dir, ctrl_images)

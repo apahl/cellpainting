@@ -433,6 +433,14 @@ class DataSet():
         return result
 
 
+    def cpd_similarity(self, cpd1, cpd2):
+        """Calculate the similarity of the activity profiles from two compounds
+        (identified by `Compound_Id`). Returns value between 0 .. 1"""
+        act1 = (self.data[self.data["Compound_Id"] == cpd1]["Act_Profile"]).values[0]
+        act2 = (self.data[self.data["Compound_Id"] == cpd2]["Act_Profile"]).values[0]
+        return cpt.profile_sim(act1, act2)
+
+
     def count_active_parameters_occurrences(self, parameters=ACT_PROF_PARAMETERS):
         """Counts the number of times each parameter has been active in the dataset."""
         return count_active_parameters_occurrences(self.data, parameters=ACT_PROF_PARAMETERS)
@@ -967,6 +975,14 @@ def find_similar_in_refs(df, cpd_ids=None, df_refs=None, cutoff=0.6, max_num=5, 
                 result["Trivial_Name"].append("")
                 result["Known_Act"].append("")
     return pd.DataFrame(result)
+
+
+def cpd_similarity(df, cpd1, cpd2):
+    """Calculate the similarity of the activity profiles from two compounds
+    (identified by `Compound_Id`). Returns value between 0 .. 1"""
+    act1 = df[df["Compound_Id"] == cpd1]["Activity"]
+    act2 = df[df["Compound_Id"] == cpd2]["Activity"]
+    return cpt.profile_sim(act1, act2)
 
 
 def count_active_parameters_occurrences(df, parameters=ACT_PROF_PARAMETERS):
