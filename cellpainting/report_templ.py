@@ -218,7 +218,7 @@ DETAILS_TEMPL = """
 <tr><td class="noborder">Cell Viability:</td><td class="noborder">$Fitness %</td></tr>
 §TABLE_EXTRO
 </div>
-<p><br><br>$mol_img</p>
+<p style='height: 220px;'><br><br>$mol_img</p>
 </div>
 <br>
 <br>

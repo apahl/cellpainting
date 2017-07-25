@@ -249,7 +249,8 @@ class DataSet():
         """Flag data rows of toxic compounds"""
         result = DataSet()
         result.data = flag_toxic(self.data, cutoff=cutoff)
-        result.print_log("flag toxic")
+        flagged = result.data["Toxic"].sum()
+        result.print_log("flag toxic", "{:3d} flagged".format(flagged))
         return result
 
 
@@ -534,12 +535,14 @@ def join_layout_384(df, layout_fn, on="Address"):
     return result
 
 
-def join_layout_1536(df, layout_fn, plate, on="Address_384", sep="\t", how="inner"):
+def join_layout_1536(df, layout_fn, quadrant, on="Address_384", sep="\t", how="inner"):
     """Cell Painting is always run in 384er plates.
     COMAS standard screening plates are format 1536.
     With this function, the 1536-to-384 reformatting file
     with the smiles added by join_smiles_to_layout_1536()
     can be used directly to join the layout to the individual 384er plates."""
+    if not isinstance(quadrant, str):
+        quadrant = str(quadrant)
     result = df.copy()
     layout = pd.read_csv(layout_fn, sep=sep)
     layout[on] = layout["Plate_name_384"].str[-1:] + layout[on]
@@ -547,7 +550,7 @@ def join_layout_1536(df, layout_fn, plate, on="Address_384", sep="\t", how="inne
     layout["Compound_Id"] = layout["Container_ID_1536"].str[:6]
     drop = ["Container_ID_1536", "Plate_name_384", "Plate_name_1536", "Address_1536", "Index"]
     layout.drop(drop, axis=1, inplace=True)
-    result[on] = plate[-1:] + result["Metadata_Well"]
+    result[on] = quadrant[-1:] + result["Metadata_Well"]
     result = result.merge(layout, on=on, how=how)
     result.drop(on, axis=1, inplace=True)
     result = result.apply(pd.to_numeric, errors='ignore')
@@ -624,7 +627,10 @@ def remove_skipped_echo_direct_transfer(df, fn):
     Returns a new dataframe without the skipped wells."""
     assert fn.endswith(".xml"), "Echo file expected in XML format."
     skipped_wells = []
-    echo_fn = glob.glob(fn)[0]  # use the first glob match
+    try:
+        echo_fn = glob.glob(fn)[0]  # use the first glob match
+    except IndexError:
+        raise FileNotFoundError("Echo file could not be found")
     echo_print = ET.parse(echo_fn).getroot()
     skipped = echo_print.find("skippedwells")
     for well in skipped.findall("w"):
@@ -977,11 +983,11 @@ def find_similar_in_refs(df, cpd_ids=None, df_refs=None, cutoff=0.6, max_num=5, 
     return pd.DataFrame(result)
 
 
-def cpd_similarity(df, cpd1, cpd2):
+def cpd_similarity(df1, cpd1, df2, cpd2):
     """Calculate the similarity of the activity profiles from two compounds
     (identified by `Compound_Id`). Returns value between 0 .. 1"""
-    act1 = df[df["Compound_Id"] == cpd1]["Activity"]
-    act2 = df[df["Compound_Id"] == cpd2]["Activity"]
+    act1 = df1[df1["Compound_Id"] == cpd1]["Activity"]
+    act2 = df2[df2["Compound_Id"] == cpd2]["Activity"]
     return cpt.profile_sim(act1, act2)
 
 

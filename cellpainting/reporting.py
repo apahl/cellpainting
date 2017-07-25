@@ -259,6 +259,7 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
             # rec["Num_Sim_Ref"] = ""
             rec["Max_Sim"] = ""
             rec["Link"] = ""
+            rec["Col_Sim"] = COL_WHITE
         else:
             rec["Act_Flag"] = "active"
             act_profile = rec["Act_Profile"]
@@ -381,7 +382,7 @@ def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cut
     write_page(overview, title=title, fn=overview_fn)
     # print(detailed_cpds)
     print("* creating detailed reports...")
-    print("  * loading Control images...")
+    print("  * loading control images...")
     ctrl_images = load_control_images(src_dir)
     print("  * writing individual reports...")
     df_detailed = df[df["Compound_Id"].isin(detailed_cpds)]
