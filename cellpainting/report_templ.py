@@ -60,6 +60,23 @@ td {
   border-color:black;
   padding: 5px;
 }
+th.noborder {
+  border-collapse: collapse;
+  border-width: thin;
+  border-style: solid;
+  border-color: white;
+  background-color: #94CAEF;
+  text-align: left;
+  font-weight: bold;
+  padding: 5px;
+}
+td.noborder {
+  border-collapse:collapse;
+  border-width:thin;
+  border-style:solid;
+  border-color:white;
+  padding: 5px;
+}
 </style>"""
 
 TABLE_INTRO = """
@@ -105,10 +122,10 @@ OVERVIEW_TABLE_ROW = """
     <td title="Producer">$Producer</td>
     <td title="Activity\nFlag">$Act_Flag</td>
     <td title="Activity [%]">$Activity</td>
-    <td title="Purity\nFlag">$Pure_Flag</td>
-    <td title="Toxic">$Toxic</td>
-    <td title="Cell\nViability [%]">$Fitness</td>
-    <td title="Highest Similarity\nto a Reference [%]">$Max_Sim</td>
+    <td title="Purity\nFlag" bgcolor=$Col_Purity>$Pure_Flag</td>
+    <td title="Toxic" bgcolor=$Col_Toxic>$Toxic</td>
+    <td title="Cell\nViability [%]" bgcolor=$Col_Fitness>$Fitness</td>
+    <td title="Highest Similarity\nto a Reference [%]" bgcolor=$Col_Sim>$Max_Sim</td>
     <td>$Link</td>
 </tr>"""
 
@@ -130,6 +147,32 @@ REF_TABLE_ROW = """
     <td>$Similarity</td>
     <td>$Trivial_Name</td>
     <td>$Known_Act</td>
+</tr>"""
+
+IMAGES_TABLE = """
+<tr>
+    <th></th>
+    <th>Mitochondria</th>
+    <th>Golgi / <br>Cell Membrane / <br>Cytoskeleton</th>
+    <th>Cytoplasmic RNA / <br>Nucleoli</th>
+    <th>Endoplasmatic<br>Reticulum</th>
+    <th>Nuclei</th>
+</tr>
+<tr>
+    <td>C<br>o<br>m<br>p<br>o<br>u<br>n<br>d</td>
+    <td>$Img_1_Cpd</td>
+    <td>$Img_2_Cpd</td>
+    <td>$Img_3_Cpd</td>
+    <td>$Img_4_Cpd</td>
+    <td>$Img_5_Cpd</td>
+</tr>
+<tr>
+    <td>C<br>o<br>n<br>t<br>r<br>o<br>l</td>
+    <td>$Img_1_Ctrl</td>
+    <td>$Img_2_Ctrl</td>
+    <td>$Img_3_Ctrl</td>
+    <td>$Img_4_Ctrl</td>
+    <td>$Img_5_Ctrl</td>
 </tr>"""
 
 INC_PARM_TABLE_HEADER = """
@@ -154,16 +197,23 @@ DETAILS_TEMPL = """
 <p style="float: right;">$mol_img</p>
 <h1>Detailed Report</h1>
 <h2>Compound Id $Compound_Id</h2>
-<p>Producer: $Producer</p>
-<p>Activity: $Activity %</p>
+§TABLE_INTRO
+<tr><td class="noborder">Producer:</td><td class="noborder">$Producer</td></tr>
+<tr><td class="noborder">Activity:</td><td class="noborder">$Activity %</td></tr>
+<tr><td class="noborder">Cell Viability:</td><td class="noborder">$Fitness %</td></tr>
+§TABLE_EXTRO
 <br>
 <br>
 <h3>Similar References</h3>
-§TABLE_INTRO
-§REF_TABLE_HEADER
 $Ref_Table
-§TABLE_EXTRO
 <p></p>
+<br>
+<br>
+<h3>Images</h3>
+Sample images from site 5.
+§TABLE_INTRO
+§IMAGES_TABLE
+§TABLE_EXTRO
 <br>
 <br>
 <h3>Parameters Increased Compared to Control</h3>
@@ -181,41 +231,8 @@ $Dec_Parm_Table
 §TABLE_EXTRO
 <p>($Date)</p>"""
 d = {"TABLE_INTRO": TABLE_INTRO, "TABLE_EXTRO": TABLE_EXTRO,
-     "REF_TABLE_HEADER": REF_TABLE_HEADER, "INC_PARM_TABLE_HEADER": INC_PARM_TABLE_HEADER,
+     "IMAGES_TABLE": IMAGES_TABLE,
+     "INC_PARM_TABLE_HEADER": INC_PARM_TABLE_HEADER,
      "DEC_PARM_TABLE_HEADER": DEC_PARM_TABLE_HEADER}
 t = PreTemplate(DETAILS_TEMPL)
 DETAILS_TEMPL = t.substitute(d)
-
-DETAILS_TEMPL_NO_SIM_REFS = """
-<p style="float: right;">$mol_img</p>
-<h1>Detailed Report</h1>
-<h2>Compound Id $Compound_Id</h2>
-<p>Producer: $Producer</p>
-<p>Activity: $Activity %</p>
-<br>
-<br>
-<h3>Similar References</h3>
-No Similar References were found.
-<p></p>
-<br>
-<br>
-<h3>Parameters Increased Compared to Control</h3>
-§TABLE_INTRO
-§INC_PARM_TABLE_HEADER
-$Inc_Parm_Table
-§TABLE_EXTRO
-<p></p>
-<br>
-<br>
-<h3>Parameters Decreased Compared to Control</h3>
-§TABLE_INTRO
-§DEC_PARM_TABLE_HEADER
-$Dec_Parm_Table
-§TABLE_EXTRO
-
-<p>($Date)</p>"""
-d = {"TABLE_INTRO": TABLE_INTRO, "TABLE_EXTRO": TABLE_EXTRO,
-     "INC_PARM_TABLE_HEADER": INC_PARM_TABLE_HEADER,
-     "DEC_PARM_TABLE_HEADER": DEC_PARM_TABLE_HEADER}
-t = PreTemplate(DETAILS_TEMPL_NO_SIM_REFS)
-DETAILS_TEMPL_NO_SIM_REFS = t.substitute(d)

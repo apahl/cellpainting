@@ -57,6 +57,11 @@ except ImportError:
     print("  * Avalon not available. Using RDKit for 2d coordinate generation.")
     USE_AVALON_2D = False
 
+COL_WHITE = "#ffffff"
+COL_GREEN = "#77ff33"
+COL_YELLOW = "#ffff99"
+COL_RED = "#ff6666"
+
 
 def check_2d_coords(mol, force=False):
     """Check if a mol has 2D coordinates and if not, calculate them."""
@@ -125,21 +130,48 @@ def convert_bool(dict, dkey, true="Yes", false="No", default="n.d."):
         dict[dkey] = default
 
 
-def b64_img(mol, size=300):
+def load_image(path, well, channel):
+    image_fn = "{}/{}_w{}.png".format(path, well, channel)
+    im = Image.open(image_fn)
+    return im
+
+
+def b64_mol(mol, size=300):
     img_file = IO()
     img = autocrop(Draw.MolToImage(mol, size=(size, size)))
     img.save(img_file, format='PNG')
-
     b64 = base64.b64encode(img_file.getvalue())
     b64 = b64.decode()
     img_file.close()
+    return b64
 
+
+def b64_img(im, size=200):
+    img_file = IO()
+    im.save(img_file, format='PNG')
+    b64 = base64.b64encode(img_file.getvalue())
+    b64 = b64.decode()
+    img_file.close()
     return b64
 
 
 def mol_img_tag(mol):
-    img_tag = '<img src="data:image/png;base64,{}" alt="Mol"/>'.format(b64_img(mol))
+    img_tag = '<img src="data:image/png;base64,{}" alt="Mol"/>'.format(b64_mol(mol))
     return img_tag
+
+
+def img_tag(im):
+    img_tag = '<img src="data:image/png;base64,{}" alt="Cell"/>'.format(b64_img(im))
+    return img_tag
+
+
+def load_control_images(src_dir):
+    image_dir = op.join(src_dir, "images")
+    ctrl_images = {}
+    for ch in range(1, 6):
+        im = load_image(image_dir, "H11", ch)
+        ctrl_images[ch] = img_tag(im)
+    return ctrl_images
 
 
 def write(text, fn):
@@ -153,7 +185,47 @@ def write_page(page, title="Report", fn="index.html"):
     write(result, fn=fn)
 
 
-def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None):
+def assign_colors(rec):
+    if "Toxic" in rec:
+        if rec["Toxic"]:
+            rec["Col_Toxic"] = COL_RED
+        else:
+            rec["Col_Toxic"] = COL_GREEN
+    else:
+        rec["Col_Toxic"] = COL_WHITE
+
+    if "Pure_Flag" in rec:
+        if rec["Pure_Flag"] == "Ok":
+            rec["Col_Purity"] = COL_GREEN
+        elif rec["Pure_Flag"] == "Warn":
+            rec["Col_Purity"] = COL_YELLOW
+        elif rec["Pure_Flag"] == "Fail":
+            rec["Col_Purity"] = COL_RED
+        else:
+            rec["Col_Purity"] = COL_WHITE
+    else:
+        rec["Col_Purity"] = COL_WHITE
+
+    if rec["Fitness"] >= 75:
+        rec["Col_Fitness"] = COL_GREEN
+    elif rec["Fitness"] >= 55:
+        rec["Col_Fitness"] = COL_YELLOW
+    else:
+        rec["Col_Fitness"] = COL_RED
+
+    if rec["Activity"] < ACT_CUTOFF_PERC:
+        rec["Col_Active"] = COL_RED
+    else:
+        rec["Col_Active"] = COL_GREEN
+
+
+def remove_colors(rec):
+    for k in rec.keys():
+        if k.startswith("Col_"):
+            rec[k] = COL_WHITE
+
+
+def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=False):
     """detailed_cpds = {Compound_Id: [{"Compound_Id": Sim_Ref_Id with highest Similarity, "Trivial_Name": ...,
     "Similarity": ..., "Known_Act": ..., "Smiles": ...},
     {{"Compound_Id": Sim_Ref_Id with next highest Similarity, "Tr...}]}"""
@@ -168,7 +240,9 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None):
         mol = mol_from_smiles(rec.get("Smiles", "C"))
         rec["mol_img"] = mol_img_tag(mol)
         rec["idx"] = idx
+        assign_colors(rec)
         convert_bool(rec, "Toxic")
+
 
         if rec["Activity"] < ACT_CUTOFF_PERC:
             rec["Act_Flag"] = "inactive"
@@ -183,9 +257,15 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None):
             if sim_refs.shape[0] == 0:
                 # rec["Num_Sim_Ref"] = "None"
                 rec["Max_Sim"] = "< {}".format(cutoff * 100)
+                rec["Col_Sim"] = COL_RED
             else:
                 # rec["Num_Sim_Ref"] = str(sim_refs.shape[0])
-                rec["Max_Sim"] = str(sim_refs["Similarity"].max() * 100)
+                max_sim = sim_refs["Similarity"].max() * 100
+                rec["Max_Sim"] = str(max_sim)
+                if max_sim >= 80:
+                    rec["Col_Sim"] = COL_GREEN
+                elif max_sim >= cutoff * 100:
+                    rec["Col_Sim"] = COL_YELLOW
             rec["Link"] = '<a href="details/{}.html">Detailed<br>Report</a>'.format(rec["Compound_Id"])
             if detailed_cpds is not None:
                 detailed_cpds[rec["Compound_Id"]] = []
@@ -197,13 +277,16 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None):
                     ref_dict["Similarity"] = ref["Similarity"]
                     ref_dict["Known_Act"] = ref["Known_Act"]
                     detailed_cpds[rec["Compound_Id"]].append(ref_dict)
+        if not highlight:
+            # remove all coloring again:
+            remove_colors(rec)
         report.append(row_templ.substitute(rec))
     report.append(cprt.TABLE_EXTRO)
     return "\n".join(report)
 
 
 def sim_ref_table(sim_refs):
-    table = []
+    table = [cprt.TABLE_INTRO, cprt.REF_TABLE_HEADER]
     templ = Template(cprt.REF_TABLE_ROW)
     for idx, sim_ref in enumerate(sim_refs, 1):
         rec = sim_ref.copy()
@@ -213,6 +296,7 @@ def sim_ref_table(sim_refs):
         rec["idx"] = idx
         row = templ.substitute(rec)
         table.append(row)
+    table.append(cprt.TABLE_EXTRO)
     return "\n".join(table)
 
 
@@ -230,8 +314,9 @@ def changed_parameters_table(act_prof, val, parameters=ACT_PROF_PARAMETERS):
     return "\n".join(table)
 
 
-def detailed_report(rec, sim_refs):
+def detailed_report(rec, sim_refs, src_dir, ctrl_images):
     date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
+    image_dir = op.join(src_dir, "images")
     act_prof = rec["Act_Profile"]
     inc_parm = changed_parameters_table(act_prof, "2")
     dec_parm = changed_parameters_table(act_prof, "0")
@@ -242,22 +327,28 @@ def detailed_report(rec, sim_refs):
         "Date": date,
         "Producer": rec["Producer"],
         "Activity": rec["Activity"],
+        "Fitness": rec["Fitness"],
         "mol_img": mol_img_tag(mol),
         "Inc_Parm_Table": inc_parm,
-        "Dec_Parm_Table": dec_parm
+        "Dec_Parm_Table": dec_parm,
     }
+    well = rec["Metadata_Well"]
+    for ch in range(1, 6):
+        im = load_image(image_dir, well, ch)
+        templ_dict["Img_{}_Cpd".format(ch)] = img_tag(im)
+        templ_dict["Img_{}_Ctrl".format(ch)] = ctrl_images[ch]
     if len(sim_refs) > 0:
         ref_tbl = sim_ref_table(sim_refs)
         templ_dict["Ref_Table"] = ref_tbl
-        t = Template(cprt.DETAILS_TEMPL)
     else:
-        t = Template(cprt.DETAILS_TEMPL_NO_SIM_REFS)
+        templ_dict["Ref_Table"] = "No similar References found."
+    t = Template(cprt.DETAILS_TEMPL)
 
     report = t.substitute(templ_dict)
     return report
 
 
-def full_report(df, df_refs=None, dirname="report", plate=None, cutoff=0.6):
+def full_report(df, src_dir, df_refs=None, dirname="report", plate=None, cutoff=0.6, highlight=False):
     overview_fn = op.join(dirname, "index.html")
     date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
     cpt.create_dirs(op.join(dirname, "details"))
@@ -272,17 +363,21 @@ def full_report(df, df_refs=None, dirname="report", plate=None, cutoff=0.6):
         title = plate
         header += "<h3>Plate {}</h3>\n".format(plate)
     header += "<p>({})</p>\n".format(date)
-    overview = header + overview_report(df, df_refs, cutoff=cutoff, detailed_cpds=detailed_cpds)
+    overview = header + overview_report(df, df_refs, cutoff=cutoff,
+                                        detailed_cpds=detailed_cpds, highlight=highlight)
     write_page(overview, title=title, fn=overview_fn)
     # print(detailed_cpds)
     print("* creating detailed reports...")
+    print("  * loading Control images...")
+    ctrl_images = load_control_images(src_dir)
+    print("  * writing individual reports...")
     df_detailed = df[df["Compound_Id"].isin(detailed_cpds)]
     for _, rec in df_detailed.iterrows():
         cpd_id = rec["Compound_Id"]
         fn = op.join(dirname, "details", "{}.html".format(cpd_id))
         title = "{} Details".format(cpd_id)
         sim_refs = detailed_cpds[cpd_id]
-        details = detailed_report(rec, sim_refs)
+        details = detailed_report(rec, sim_refs, src_dir, ctrl_images)
         write_page(details, title=title, fn=fn)
 
     return HTML('<a href="{}">{}</a>'.format(overview_fn, "Overview"))
