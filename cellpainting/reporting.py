@@ -58,9 +58,9 @@ except ImportError:
     USE_AVALON_2D = False
 
 COL_WHITE = "#ffffff"
-COL_GREEN = "#77ff33"
-COL_YELLOW = "#ffff99"
-COL_RED = "#ff6666"
+COL_GREEN = "#ccffcc"
+COL_YELLOW = "#ffffcc"
+COL_RED = "#ffcccc"
 
 
 def check_2d_coords(mol, force=False):
@@ -183,6 +183,11 @@ def load_control_images(src_dir):
     return ctrl_images
 
 
+def sanitize_filename(fn):
+    result = fn.replace(":", "_").replace(",", "_")
+    return result
+
+
 def write(text, fn):
     with open(fn, "w") as f:
         f.write(text)
@@ -254,14 +259,21 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
         assign_colors(rec)
         convert_bool(rec, "Toxic")
 
-        if rec["Activity"] < ACT_CUTOFF_PERC:
-            rec["Act_Flag"] = "inactive"
-            # rec["Num_Sim_Ref"] = ""
+        has_details = True
+        rec["Act_Flag"] = "active"
+        if rec["Toxic"] == "Yes":
+            has_details = False
             rec["Max_Sim"] = ""
             rec["Link"] = ""
             rec["Col_Sim"] = COL_WHITE
-        else:
-            rec["Act_Flag"] = "active"
+        if rec["Activity"] < ACT_CUTOFF_PERC:
+            has_details = False
+            rec["Act_Flag"] = "inactive"
+            rec["Max_Sim"] = ""
+            rec["Link"] = ""
+            rec["Col_Sim"] = COL_WHITE
+
+        if has_details:
             act_profile = rec["Act_Profile"]
             sim_refs = cpp.find_similar(df_refs, act_profile, cutoff=cutoff, max_num=5)
             sim_refs = sim_refs.fillna("&mdash;")
@@ -277,17 +289,19 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
                     rec["Col_Sim"] = COL_GREEN
                 elif max_sim >= cutoff * 100:
                     rec["Col_Sim"] = COL_YELLOW
-            rec["Link"] = '<a href="details/{}.html">Detailed<br>Report</a>'.format(rec["Compound_Id"])
+            details_fn = sanitize_filename(rec["Container_Id"])
+            rec["Link"] = '<a href="details/{}.html">Detailed<br>Report</a>'.format(details_fn)
             if detailed_cpds is not None:
-                detailed_cpds[rec["Compound_Id"]] = []
+                detailed_cpds[rec["Container_Id"]] = []
                 for _, ref in sim_refs.iterrows():
-                    ref_dict = {}
-                    ref_dict["Compound_Id"] = ref["Compound_Id"]
-                    ref_dict["Smiles"] = ref["Smiles"]
-                    ref_dict["Trivial_Name"] = ref["Trivial_Name"]
-                    ref_dict["Similarity"] = ref["Similarity"]
-                    ref_dict["Known_Act"] = ref["Known_Act"]
-                    detailed_cpds[rec["Compound_Id"]].append(ref_dict)
+                    ref_dict = dict(ref)
+                    # ref_dict["Compound_Id"] = ref["Compound_Id"]
+                    # ref_dict["Container_Id"] = ref["Container_Id"]
+                    # ref_dict["Smiles"] = ref["Smiles"]
+                    # ref_dict["Trivial_Name"] = ref["Trivial_Name"]
+                    # ref_dict["Similarity"] = ref["Similarity"]
+                    # ref_dict["Known_Act"] = ref["Known_Act"]
+                    detailed_cpds[rec["Container_Id"]].append(ref_dict)
         if not highlight:
             # remove all coloring again:
             remove_colors(rec)
@@ -337,6 +351,7 @@ def detailed_report(rec, sim_refs, src_dir, ctrl_images):
 
     templ_dict = {
         "Compound_Id": rec["Compound_Id"],
+        "Container_Id": rec["Container_Id"],
         "Date": date,
         "Producer": rec["Producer"],
         "Activity": rec["Activity"],
@@ -385,12 +400,12 @@ def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cut
     print("  * loading control images...")
     ctrl_images = load_control_images(src_dir)
     print("  * writing individual reports...")
-    df_detailed = df[df["Compound_Id"].isin(detailed_cpds)]
+    df_detailed = df[df["Container_Id"].isin(detailed_cpds)]
     for _, rec in df_detailed.iterrows():
-        cpd_id = rec["Compound_Id"]
-        fn = op.join(report_name, "details", "{}.html".format(cpd_id))
-        title = "{} Details".format(cpd_id)
-        sim_refs = detailed_cpds[cpd_id]
+        container_id = rec["Container_Id"]
+        fn = op.join(report_name, "details", "{}.html".format(sanitize_filename(container_id)))
+        title = "{} Details".format(container_id)
+        sim_refs = detailed_cpds[container_id]
         details = detailed_report(rec, sim_refs, src_dir, ctrl_images)
         write_page(details, title=title, fn=fn)
 

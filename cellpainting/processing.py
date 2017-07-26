@@ -60,7 +60,7 @@ except ImportError:
 
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
-                    "Compound_Id", 'Batch_Id', "Producer", "Pure_Flag", "Toxic", "Fitness",
+                    "Compound_Id", 'Container_Id', "Producer", "Pure_Flag", "Toxic", "Fitness",
                     "Known_Act", "Trivial_Name", 'WellType', 'Conc_uM', "Activity", "Act_Profile", "Smiles"]
 DROP_FROM_NUMBERS = ['plateColumn', 'plateRow', 'Conc_uM', "Compound_Id"]
 DROP_GLOBAL = ["PathName_CellOutlines", "URL_CellOutlines", 'FileName_CellOutlines',
@@ -437,9 +437,7 @@ class DataSet():
     def cpd_similarity(self, cpd1, cpd2):
         """Calculate the similarity of the activity profiles from two compounds
         (identified by `Compound_Id`). Returns value between 0 .. 1"""
-        act1 = (self.data[self.data["Compound_Id"] == cpd1]["Act_Profile"]).values[0]
-        act2 = (self.data[self.data["Compound_Id"] == cpd2]["Act_Profile"]).values[0]
-        return cpt.profile_sim(act1, act2)
+        return cpd_similarity(self.data, cpd1, self.data, cpd2)
 
 
     def count_active_parameters_occurrences(self, parameters=ACT_PROF_PARAMETERS):
@@ -491,6 +489,7 @@ def read_smiles_file(fn, props=['Compound_Id', "Producer", "Smiles", "Pure_Flag"
     Return a DataFrame for fast access."""
     result = pd.read_csv(fn, sep="\t")
     result = result[props]
+    result = result.apply(pd.to_numeric, errors='ignore')
     return result
 
 
@@ -535,6 +534,13 @@ def join_layout_384(df, layout_fn, on="Address"):
     return result
 
 
+def get_cpd_from_container(df):
+    result = pd.concat([df, df["Container_Id"].str.split(":", expand=True)], axis=1)
+    result.rename(columns={0: "Compound_Id"}, inplace=True)
+    result.drop([1])
+    return result
+
+
 def join_layout_1536(df, layout_fn, quadrant, on="Address_384", sep="\t", how="inner"):
     """Cell Painting is always run in 384er plates.
     COMAS standard screening plates are format 1536.
@@ -546,9 +552,9 @@ def join_layout_1536(df, layout_fn, quadrant, on="Address_384", sep="\t", how="i
     result = df.copy()
     layout = pd.read_csv(layout_fn, sep=sep)
     layout[on] = layout["Plate_name_384"].str[-1:] + layout[on]
-    layout["Batch_Id"] = layout["Container_ID_1536"].str[:9]
-    layout["Compound_Id"] = layout["Container_ID_1536"].str[:6]
-    drop = ["Container_ID_1536", "Plate_name_384", "Plate_name_1536", "Address_1536", "Index"]
+    layout.rename(columns={"Container_ID_1536": "Container_Id"}, inplace=True)
+    layout = get_cpd_from_container(layout)
+    drop = ["Plate_name_384", "Plate_name_1536", "Address_1536", "Index"]
     layout.drop(drop, axis=1, inplace=True)
     result[on] = quadrant[-1:] + result["Metadata_Well"]
     result = result.merge(layout, on=on, how=how)
@@ -566,7 +572,8 @@ def join_smiles(df, df_smiles=None):
         df_smiles = df_smiles[keep]
     elif isinstance(df_smiles, str):
         df_smiles = pd.read_csv(df_smiles, sep="\t")
-    df_smiles["Compound_Id"] = df_smiles["Compound_Id"].astype("int")
+    df_smiles = df_smiles.apply(pd.to_numeric, errors='ignore')
+    # df_smiles["Compound_Id"] = df_smiles["Compound_Id"].astype("int")
     result = df.merge(df_smiles, on="Compound_Id", how="inner")
     result = result.apply(pd.to_numeric, errors='ignore')
     return result
@@ -986,9 +993,9 @@ def find_similar_in_refs(df, cpd_ids=None, df_refs=None, cutoff=0.6, max_num=5, 
 def cpd_similarity(df1, cpd1, df2, cpd2):
     """Calculate the similarity of the activity profiles from two compounds
     (identified by `Compound_Id`). Returns value between 0 .. 1"""
-    act1 = df1[df1["Compound_Id"] == cpd1]["Activity"]
-    act2 = df2[df2["Compound_Id"] == cpd2]["Activity"]
-    return cpt.profile_sim(act1, act2)
+    act1 = df1[df1["Compound_Id"] == cpd1]["Act_Profile"].values[0]
+    act2 = df2[df2["Compound_Id"] == cpd2]["Act_Profile"].values[0]
+    return round(cpt.profile_sim(act1, act2), 3)
 
 
 def count_active_parameters_occurrences(df, parameters=ACT_PROF_PARAMETERS):

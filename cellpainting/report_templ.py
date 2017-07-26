@@ -115,7 +115,7 @@ OVERVIEW_TABLE_HEADER = """
 <tr>
     <th>Idx</th>
     <th>Mol</th>
-    <th>Compound_Id</th>
+    <th>Container_Id</th>
     <th>Producer</th>
     <th>Activity<br>Flag</th>
     <th>Activity [%]</th>
@@ -130,7 +130,7 @@ OVERVIEW_TABLE_ROW = """
 <tr>
     <td>$idx</td>
     <td>$mol_img</td>
-    <td title="Compound_Id">$Compound_Id</td>
+    <td title="Container_Id">$Container_Id</td>
     <td title="Producer">$Producer</td>
     <td title="Activity\nFlag">$Act_Flag</td>
     <td title="Activity [%]">$Activity</td>
@@ -145,7 +145,7 @@ REF_TABLE_HEADER = """
 <tr>
     <th>Idx</th>
     <th>Mol</th>
-    <th>Compound_Id</th>
+    <th>Container_Id</th>
     <th>Similarity [%]</th>
     <th>Trivial Name</th>
     <th>Known Activity</th>
@@ -155,7 +155,7 @@ REF_TABLE_ROW = """
 <tr>
     <td>$idx</td>
     <td>$mol_img</td>
-    <td>$Compound_Id</td>
+    <td>$Container_Id</td>
     <td>$Sim_Format</td>
     <td>$Trivial_Name</td>
     <td>$Known_Act</td>
@@ -212,6 +212,7 @@ DETAILS_TEMPL = """
 <h1>Detailed Report</h1>
 <h2>Compound Id $Compound_Id</h2>
 §TABLE_INTRO
+<tr><td class="noborder">Container Id:</td><td class="noborder">$Container_Id</td></tr>
 <tr><td class="noborder">Producer:</td><td class="noborder">$Producer</td></tr>
 <tr><td class="noborder">Activity:</td><td class="noborder">$Activity %</td></tr>
 <tr><td class="noborder">Purity Flag:</td><td class="noborder">$Pure_Flag</td></tr>
