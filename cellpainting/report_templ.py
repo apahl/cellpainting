@@ -86,10 +86,10 @@ td.noborder {
 }
 </style>"""
 
-lpath = op.join(op.dirname(__file__), "../res/Comas3.png")
+lpath = op.join(op.dirname(__file__), "../res/Comas3.jpg")
 logo = Image.open(lpath)
-LOGO = '<img style="float: right; width: 300px;" src="data:image/png;base64,{}" alt="Cell"/>'
-LOGO = LOGO.format(b64_img(logo, format="PNG"))
+LOGO = '<img style="float: right; width: 300px;" src="data:image/jpg;base64,{}" alt="Cell"/>'
+LOGO = LOGO.format(b64_img(logo))
 
 TABLE_INTRO = """
 <table id="table" width="" cellspacing="1" cellpadding="1" border="1" height="60" summary="">"""
@@ -156,7 +156,7 @@ REF_TABLE_ROW = """
     <td>$idx</td>
     <td>$mol_img</td>
     <td>$Compound_Id</td>
-    <td>$Similarity</td>
+    <td>$Sim_Format</td>
     <td>$Trivial_Name</td>
     <td>$Known_Act</td>
 </tr>"""

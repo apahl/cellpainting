@@ -272,7 +272,7 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
             else:
                 # rec["Num_Sim_Ref"] = str(sim_refs.shape[0])
                 max_sim = sim_refs["Similarity"].max() * 100
-                rec["Max_Sim"] = str(max_sim)
+                rec["Max_Sim"] = "{:.1f}".format(max_sim)
                 if max_sim >= 80:
                     rec["Col_Sim"] = COL_GREEN
                 elif max_sim >= cutoff * 100:
@@ -302,7 +302,7 @@ def sim_ref_table(sim_refs):
     for idx, sim_ref in enumerate(sim_refs, 1):
         rec = sim_ref.copy()
         mol = mol_from_smiles(rec.get("Smiles", "C"))
-        rec["Similarity"] *= 100
+        rec["Sim_Format"] = "{:.1f}".format(rec["Similarity"] * 100)
         rec["mol_img"] = mol_img_tag(mol)
         rec["idx"] = idx
         row = templ.substitute(rec)
@@ -394,4 +394,5 @@ def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cut
         details = detailed_report(rec, sim_refs, src_dir, ctrl_images)
         write_page(details, title=title, fn=fn)
 
+    print("* done.")
     return HTML('<a href="{}">{}</a>'.format(overview_fn, "Overview"))
