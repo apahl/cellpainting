@@ -86,6 +86,50 @@ td.noborder {
 }
 </style>"""
 
+JS = """
+function sortOverviewTable(col_no, ascending) {
+  var table, rows, switching, i, x, y, shouldSwitch;
+  table = document.getElementById("overview");
+  switching = true;
+  /*Make a loop that will continue until
+  no switching has been done:*/
+  while (switching) {
+    //start by saying: no switching is done:
+    switching = false;
+    rows = table.getElementsByTagName("TR");
+    /*Loop through all table rows (except the
+    first, which contains table headers):*/
+    for (i = 1; i < (rows.length - 1); i++) {
+      //start by saying there should be no switching:
+      shouldSwitch = false;
+      /*Get the two elements you want to compare,
+      one from current row and one from the next:*/
+      x = rows[i].getElementsByTagName("TD")[col_no];
+      y = rows[i + 1].getElementsByTagName("TD")[col_no];
+      //check if the two rows should switch place:
+      if (ascending) {
+        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+            //if so, mark as a switch and break the loop:
+            shouldSwitch = true;
+            break;
+        }
+      } else {
+        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+            //if so, mark as a switch and break the loop:
+            shouldSwitch = true;
+            break;
+        }
+      }
+    }
+    if (shouldSwitch) {
+      /*If a switch has been marked, make the switch
+      and mark that a switch has been done:*/
+      rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+      switching = true;
+    }
+  }
+}"""
+
 lpath = op.join(op.dirname(__file__), "../res/Comas3.jpg")
 logo = Image.open(lpath)
 LOGO = '<img style="float: right; width: 300px;" src="data:image/jpg;base64,{}" alt="Cell"/>'
@@ -93,6 +137,8 @@ LOGO = LOGO.format(b64_img(logo))
 
 TABLE_INTRO = """
 <table id="table" width="" cellspacing="1" cellpadding="1" border="1" height="60" summary="">"""
+OVERVIEW_TABLE_INTRO = """
+<table id="overview" width="" cellspacing="1" cellpadding="1" border="1" height="60" summary="">"""
 TABLE_EXTRO = """
 </table>"""
 HTML_INTRO = """
@@ -101,11 +147,26 @@ HTML_INTRO = """
 <head>
   <title>$title</title>
   <meta charset="UTF-8">
-  §css
+  §CSS
 </head>
 <body>"""
 t = PreTemplate(HTML_INTRO)
-HTML_INTRO = t.substitute(css=CSS)
+HTML_INTRO = t.substitute(CSS=CSS)
+
+OVERVIEW_HTML_INTRO = """
+<!DOCTYPE html>
+<html>
+<head>
+  <title>$title</title>
+  <meta charset="UTF-8">
+  §CSS
+  <script>
+  §JS
+  </script>
+</head>
+<body>"""
+t = PreTemplate(OVERVIEW_HTML_INTRO)
+OVERVIEW_HTML_INTRO = t.substitute(CSS=CSS, JS=JS)
 
 HTML_EXTRO = """
 </body>
@@ -115,31 +176,45 @@ OVERVIEW_TABLE_HEADER = """
 <tr>
     <th>Idx</th>
     <th>Mol</th>
-    <th>Container_Id</th>
-    <th>Producer</th>
+    <th><b onclick="sortOverviewTable(2, true)" title="sort ascending">&darr;</b>
+        <b onclick="sortOverviewTable(2, false)" title="sort descending">&uarr;</b><br>
+        Container_Id</th>
+    <th><b onclick="sortOverviewTable(3, true)" title="sort ascending">&darr;</b>
+        <b onclick="sortOverviewTable(3, false)" title="sort descending">&uarr;</b><br>
+        Producer</th>
     <th>Activity<br>Flag</th>
-    <th>Activity [%]</th>
+    <th><b onclick="sortOverviewTable(5, true)" title="sort ascending">&darr;</b>
+        <b onclick="sortOverviewTable(5, false)" title="sort descending">&uarr;</b><br>
+        Induction [%]</th>
+    <th><b onclick="sortOverviewTable(6, true)" title="sort ascending">&darr;</b>
+        <b onclick="sortOverviewTable(6, false)" title="sort descending">&uarr;</b><br>
+        Highest Similarity<br>to a Reference [%]</th>
     <th>Purity<br>Flag</th>
     <th>Toxic</th>
-    <th>Cell<br>Viability [%]</th>
-    <th>Highest Similarity<br>to a Reference [%]</th>
+    <th><b onclick="sortOverviewTable(9, true)" title="sort ascending">&darr;</b>
+        <b onclick="sortOverviewTable(9, false)" title="sort descending">&uarr;</b><br>
+        Cell<br>Viability [%]</th>
     <th>Link to<br>Detailed Report</th>
 </tr>"""
 
 OVERVIEW_TABLE_ROW = """
 <tr>
     <td>$idx</td>
-    <td>$mol_img</td>
+    <td><a href="http://oracle-server.mpi-dortmund.mpg.de:9944/perlbin/runjob.pl?_protocol=%7B5E6F1B34-70E1-88E4-1C51-71D239DAE9E1%7D&Compound_ID=$Compound_Id&Supplier_ID=&Alternate_ID=&IC50_view=False&Compound_level=True&Batch_level=False&__QuickRun=true">$mol_img</a></td>
     <td title="Container_Id">$Container_Id</td>
     <td title="Producer">$Producer</td>
-    <td title="Activity\nFlag">$Act_Flag</td>
-    <td title="Activity [%]">$Activity</td>
+    <td title="Activity\nFlag" bgcolor=$Col_Act_Flag>$Act_Flag</td>
+    <td title="Activity [%]" bgcolor=$Col_Act>$Activity</td>
+    <td title="Highest Similarity\nto a Reference [%]" bgcolor=$Col_Sim>$Max_Sim</td>
     <td title="Purity\nFlag" bgcolor=$Col_Purity>$Pure_Flag</td>
     <td title="Toxic" bgcolor=$Col_Toxic>$Toxic</td>
     <td title="Cell\nViability [%]" bgcolor=$Col_Fitness>$Fitness</td>
-    <td title="Highest Similarity\nto a Reference [%]" bgcolor=$Col_Sim>$Max_Sim</td>
     <td>$Link</td>
 </tr>"""
+
+OVERVIEW_TEMPL = """
+§LOGO
+"""
 
 REF_TABLE_HEADER = """
 <tr>
@@ -154,7 +229,7 @@ REF_TABLE_HEADER = """
 REF_TABLE_ROW = """
 <tr>
     <td>$idx</td>
-    <td>$mol_img</td>
+    <td><a href="../../references/$Container_Id.html">$mol_img</a></td>
     <td>$Container_Id</td>
     <td>$Sim_Format</td>
     <td>$Trivial_Name</td>
@@ -219,7 +294,7 @@ DETAILS_TEMPL = """
 <tr><td class="noborder">Cell Viability:</td><td class="noborder">$Fitness %</td></tr>
 §TABLE_EXTRO
 </div>
-<p style='height: 220px;'><br><br>$mol_img</p>
+<p style='height: 220px;'><br><br><a href="http://oracle-server.mpi-dortmund.mpg.de:9944/perlbin/runjob.pl?_protocol=%7B5E6F1B34-70E1-88E4-1C51-71D239DAE9E1%7D&Compound_ID=$Compound_Id&Supplier_ID=&Alternate_ID=&IC50_view=False&Compound_level=True&Batch_level=False&__QuickRun=true">$mol_img</a></p>
 </div>
 <br>
 <br>

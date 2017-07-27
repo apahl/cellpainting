@@ -7,7 +7,12 @@ Reporting
 
 *Created on Thu Jun  8 14:40 2017 by A. Pahl*
 
-Tools for creating HTML Reports."""
+Tools for creating HTML Reports.
+&#8593;&uarr;  &#8595;&darr;
+
+<a href="http://oracle-server.mpi-dortmund.mpg.de:9944/perlbin/runjob.pl?_protocol=%7B5E6F1B34-70E1-88E4-1C51-71D239DAE9E1%7D&Compound_ID=$Compound_Id&Supplier_ID=&Alternate_ID=&IC50_view=False&Compound_level=True&Batch_level=False&__QuickRun=true">
+COMPOUND IMAGE
+</a>"""
 
 import time
 import base64
@@ -24,7 +29,9 @@ from PIL import Image, ImageChops
 from . import tools as cpt
 from . import report_templ as cprt
 from . import processing as cpp
-from .config import ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC
+from .config import (ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC,
+                     LIMIT_ACTIVITY_H, LIMIT_ACTIVITY_L,
+                     LIMIT_FITNESS_H, LIMIT_FITNESS_L)
 
 Draw.DrawingOptions.atomLabelFontFace = "DejaVu Sans"
 Draw.DrawingOptions.atomLabelFontSize = 18
@@ -193,8 +200,8 @@ def write(text, fn):
         f.write(text)
 
 
-def write_page(page, title="Report", fn="index.html"):
-    t = Template(cprt.HTML_INTRO + page + cprt.HTML_EXTRO)
+def write_page(page, title="Report", fn="index.html", templ=cprt.HTML_INTRO):
+    t = Template(templ + page + cprt.HTML_EXTRO)
     result = t.substitute(title=title)
     write(result, fn=fn)
 
@@ -220,17 +227,24 @@ def assign_colors(rec):
     else:
         rec["Col_Purity"] = COL_WHITE
 
-    if rec["Fitness"] >= 75:
+    if rec["Fitness"] >= LIMIT_FITNESS_H:
         rec["Col_Fitness"] = COL_GREEN
-    elif rec["Fitness"] >= 55:
+    elif rec["Fitness"] >= LIMIT_FITNESS_L:
         rec["Col_Fitness"] = COL_YELLOW
     else:
         rec["Col_Fitness"] = COL_RED
 
-    if rec["Activity"] < ACT_CUTOFF_PERC:
-        rec["Col_Active"] = COL_RED
+    if rec["Activity"] >= LIMIT_ACTIVITY_H:
+        rec["Col_Act"] = COL_GREEN
+    elif rec["Activity"] >= LIMIT_ACTIVITY_L:
+        rec["Col_Act"] = COL_YELLOW
     else:
-        rec["Col_Active"] = COL_GREEN
+        rec["Col_Act"] = COL_RED
+
+    if rec["Act_Flag"] == "active":
+        rec["Col_Act_Flag"] = COL_GREEN
+    else:
+        rec["Col_Act_Flag"] = COL_RED
 
 
 def remove_colors(rec):
@@ -246,7 +260,7 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
     if isinstance(df, cpp.DataSet):
         df = df.data
     df_refs = cpt.check_df(df_refs, REFERENCES)
-    report = [cprt.TABLE_INTRO, cprt.OVERVIEW_TABLE_HEADER]
+    report = [cprt.OVERVIEW_TABLE_INTRO, cprt.OVERVIEW_TABLE_HEADER]
     row_templ = Template(cprt.OVERVIEW_TABLE_ROW)
     idx = 0
     for _, rec in df.iterrows():
@@ -256,12 +270,10 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
         rec["idx"] = idx
         if "Pure_Flag" not in rec:
             rec["Pure_Flag"] = "n.d."
-        assign_colors(rec)
-        convert_bool(rec, "Toxic")
 
         has_details = True
         rec["Act_Flag"] = "active"
-        if rec["Toxic"] == "Yes":
+        if rec["Toxic"]:
             has_details = False
             rec["Max_Sim"] = ""
             rec["Link"] = ""
@@ -272,6 +284,9 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
             rec["Max_Sim"] = ""
             rec["Link"] = ""
             rec["Col_Sim"] = COL_WHITE
+        # print(rec)
+        assign_colors(rec)
+        convert_bool(rec, "Toxic")
 
         if has_details:
             act_profile = rec["Act_Profile"]
@@ -394,7 +409,7 @@ def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cut
     header += "<p>({})</p>\n".format(date)
     overview = header + overview_report(df, df_refs, cutoff=cutoff,
                                         detailed_cpds=detailed_cpds, highlight=highlight)
-    write_page(overview, title=title, fn=overview_fn)
+    write_page(overview, title=title, fn=overview_fn, templ=cprt.OVERVIEW_HTML_INTRO)
     # print(detailed_cpds)
     print("* creating detailed reports...")
     print("  * loading control images...")
