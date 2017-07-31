@@ -3,6 +3,7 @@ doc/_build/
 .kdev4/
 cellpainting/test.html
 cellpainting/test.js
+cellpainting/temp.py
 *.pkl
 *.png
 *.mrv

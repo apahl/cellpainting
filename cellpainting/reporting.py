@@ -24,14 +24,16 @@ from io import BytesIO as IO
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import Draw
 
+import numpy as np
 from PIL import Image, ImageChops
+import matplotlib.pyplot as plt
 
 from . import tools as cpt
 from . import report_templ as cprt
 from . import processing as cpp
 from .config import (ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC,
                      LIMIT_ACTIVITY_H, LIMIT_ACTIVITY_L,
-                     LIMIT_FITNESS_H, LIMIT_FITNESS_L)
+                     LIMIT_CELL_COUNT_H, LIMIT_CELL_COUNT_L)
 
 Draw.DrawingOptions.atomLabelFontFace = "DejaVu Sans"
 Draw.DrawingOptions.atomLabelFontSize = 18
@@ -154,30 +156,31 @@ def b64_mol(mol, size=300):
 
 
 def b64_img(im, format="JPEG"):
-    img_file = IO()
-    im.save(img_file, format=format)
+    if isinstance(im, IO):
+        img_file = im
+    else:
+        img_file = IO()
+        im.save(img_file, format=format)
     b64 = base64.b64encode(img_file.getvalue())
     b64 = b64.decode()
     img_file.close()
     return b64
 
 
-def mol_img_tag(mol, style=None):
-    if style is None:
-        style = ""
-    else:
-        style = """style='{}' """.format(style)
-    img_tag = '<img {}src="data:image/png;base64,{}" alt="Mol"/>'.format(style, b64_mol(mol))
+def mol_img_tag(mol, options=None):
+    tag = """<img {} src="data:image/png;base64,{}" alt="Mol"/>"""
+    if options is None:
+        options = ""
+    img_tag = tag.format(options, b64_mol(mol))
     return img_tag
 
 
-def img_tag(im, format="jpeg", style=None):
-    if style is None:
-        style = ""
-    else:
-        style = """style='{}' """.format(style)
+def img_tag(im, format="jpeg", options=None):
+    tag = """<img {} src="data:image/{};base64,{}" alt="Image"/>"""
+    if options is None:
+        options = ""
     b = b64_img(im, format=format)
-    img_tag = '<img {}src="data:image/{};base64,{}" alt="Cell"/>'.format(style, format.lower(), b)
+    img_tag = tag.format(options, format.lower(), b)
     return img_tag
 
 
@@ -186,7 +189,7 @@ def load_control_images(src_dir):
     ctrl_images = {}
     for ch in range(1, 6):
         im = load_image(image_dir, "H11", ch)
-        ctrl_images[ch] = img_tag(im, style='width: 250px;')
+        ctrl_images[ch] = img_tag(im, options='style="width: 250px;"')
     return ctrl_images
 
 
@@ -227,12 +230,12 @@ def assign_colors(rec):
     else:
         rec["Col_Purity"] = COL_WHITE
 
-    if rec["Fitness"] >= LIMIT_FITNESS_H:
-        rec["Col_Fitness"] = COL_GREEN
-    elif rec["Fitness"] >= LIMIT_FITNESS_L:
-        rec["Col_Fitness"] = COL_YELLOW
+    if rec["Rel_Cell_Count"] >= LIMIT_CELL_COUNT_H:
+        rec["Col_Cell_Count"] = COL_GREEN
+    elif rec["Rel_Cell_Count"] >= LIMIT_CELL_COUNT_L:
+        rec["Col_Cell_Count"] = COL_YELLOW
     else:
-        rec["Col_Fitness"] = COL_RED
+        rec["Cell_Count"] = COL_RED
 
     if rec["Activity"] >= LIMIT_ACTIVITY_H:
         rec["Col_Act"] = COL_GREEN
@@ -253,12 +256,16 @@ def remove_colors(rec):
             rec[k] = COL_WHITE
 
 
-def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=False):
+def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=False, mode="cpd"):
     """detailed_cpds = {Compound_Id: [{"Compound_Id": Sim_Ref_Id with highest Similarity, "Trivial_Name": ...,
     "Similarity": ..., "Known_Act": ..., "Smiles": ...},
     {{"Compound_Id": Sim_Ref_Id with next highest Similarity, "Tr...}]}"""
     if isinstance(df, cpp.DataSet):
         df = df.data
+    if "ref" in mode:
+        act_cutoff = 2.5
+    else:
+        act_cutoff = ACT_CUTOFF_PERC
     df_refs = cpt.check_df(df_refs, REFERENCES)
     report = [cprt.OVERVIEW_TABLE_INTRO, cprt.OVERVIEW_TABLE_HEADER]
     row_templ = Template(cprt.OVERVIEW_TABLE_ROW)
@@ -278,7 +285,7 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
             rec["Max_Sim"] = ""
             rec["Link"] = ""
             rec["Col_Sim"] = COL_WHITE
-        if rec["Activity"] < ACT_CUTOFF_PERC:
+        if rec["Activity"] < act_cutoff:
             has_details = False
             rec["Act_Flag"] = "inactive"
             rec["Max_Sim"] = ""
@@ -290,14 +297,17 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
 
         if has_details:
             act_profile = rec["Act_Profile"]
-            sim_refs = cpp.find_similar(df_refs, act_profile, cutoff=cutoff, max_num=5)
-            sim_refs = sim_refs.fillna("&mdash;")
+            max_num = 5
+            if "ref" in mode:
+                max_num += 1
+            sim_refs = cpp.find_similar(df_refs, act_profile, cutoff=cutoff, max_num=max_num)
+            if "ref" in mode:
+                sim_refs.drop(sim_refs.head(1).index, inplace=True)
             if sim_refs.shape[0] == 0:
-                # rec["Num_Sim_Ref"] = "None"
                 rec["Max_Sim"] = "< {}".format(cutoff * 100)
                 rec["Col_Sim"] = COL_RED
             else:
-                # rec["Num_Sim_Ref"] = str(sim_refs.shape[0])
+                sim_refs = sim_refs.fillna("&mdash;")
                 max_sim = sim_refs["Similarity"].max() * 100
                 rec["Max_Sim"] = "{:.1f}".format(max_sim)
                 if max_sim >= 80:
@@ -310,12 +320,6 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
                 detailed_cpds[rec["Container_Id"]] = []
                 for _, ref in sim_refs.iterrows():
                     ref_dict = dict(ref)
-                    # ref_dict["Compound_Id"] = ref["Compound_Id"]
-                    # ref_dict["Container_Id"] = ref["Container_Id"]
-                    # ref_dict["Smiles"] = ref["Smiles"]
-                    # ref_dict["Trivial_Name"] = ref["Trivial_Name"]
-                    # ref_dict["Similarity"] = ref["Similarity"]
-                    # ref_dict["Known_Act"] = ref["Known_Act"]
                     detailed_cpds[rec["Container_Id"]].append(ref_dict)
         if not highlight:
             # remove all coloring again:
@@ -351,35 +355,98 @@ def changed_parameters_table(act_prof, val, parameters=ACT_PROF_PARAMETERS):
         }
         row = templ.substitute(rec)
         table.append(row)
-    return "\n".join(table)
+    return "\n".join(table), changed
+
+
+def parm_stats(parameters):
+    result = []
+    channels = ["_Mito", "_Ph_golgi", "_Syto", "_ER", "Hoechst"]
+    for ch in channels:
+        cnt = len([p for p in parameters if ch in p])
+        result.append(cnt)
+    return result
+
+
+def parm_hist(increased, decreased):
+    labels = [
+        "Mito",
+        "Golgi / Membrane",
+        "RNA / Nucleoli",
+        "ER",
+        "Nuclei"
+    ]
+
+    inc_max = max(increased)
+    dec_max = max(decreased)
+    max_total = max([inc_max, dec_max])
+    inc_norm = [v / max_total for v in increased]
+    dec_norm = [v / max_total for v in decreased]
+
+    n_groups = 5
+    dpi = 96
+    plt.style.use("seaborn-white")
+    plt.style.use("seaborn-pastel")
+    plt.style.use("seaborn-talk")
+    plt.rcParams['axes.labelsize'] = 25
+    plt.rcParams['xtick.labelsize'] = 20
+    plt.rcParams['ytick.labelsize'] = 20
+    plt.rcParams['legend.fontsize'] = 20
+    size = (1500, 1000)
+    figsize = (size[0] / dpi, size[1] / dpi)
+    fig, ax = plt.subplots(figsize=figsize)
+    index = np.arange(n_groups)
+    bar_width = 0.25
+    plt.bar(index, inc_norm, bar_width,
+            color='#94caef',
+            label='Inc')
+    plt.bar(index + bar_width, dec_norm, bar_width,
+            color='#ffdd1a',
+            label='Dec')
+
+    plt.xlabel('Cell Compartment')
+    plt.ylabel('rel. Occurrence')
+    plt.xticks(index + bar_width / 2, labels, rotation=45)
+    plt.legend()
+    plt.tight_layout()
+    img_file = IO()
+    plt.savefig(img_file, bbox_inches='tight', format="png")
+    result = img_tag(img_file, format="png", options='style="width: 800px;"')
+    return result
 
 
 def detailed_report(rec, sim_refs, src_dir, ctrl_images):
     date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
     image_dir = op.join(src_dir, "images")
     act_prof = rec["Act_Profile"]
-    inc_parm = changed_parameters_table(act_prof, "2")
-    dec_parm = changed_parameters_table(act_prof, "0")
+    inc_parm, changed = changed_parameters_table(act_prof, "2")
+    increased = parm_stats(changed)
+    dec_parm, changed = changed_parameters_table(act_prof, "0")
+    decreased = parm_stats(changed)
     mol = mol_from_smiles(rec.get("Smiles", "C"))
     if "Pure_Flag" not in rec:
         rec["Pure_Flag"] = "n.d."
 
-    templ_dict = {
-        "Compound_Id": rec["Compound_Id"],
-        "Container_Id": rec["Container_Id"],
-        "Date": date,
-        "Producer": rec["Producer"],
-        "Activity": rec["Activity"],
-        "Fitness": rec["Fitness"],
-        "Pure_Flag": rec["Pure_Flag"],
-        "mol_img": mol_img_tag(mol, style='border:1px solid #000000; padding: 10px;'),
-        "Inc_Parm_Table": inc_parm,
-        "Dec_Parm_Table": dec_parm,
-    }
+    templ_dict = rec.copy()
+    templ_dict["Date"] = date
+    templ_dict["mol_img"] = mol_img_tag(mol, options='class="cpd_image"')
+    templ_dict["Inc_Parm_Table"] = inc_parm
+    templ_dict["Dec_Parm_Table"] = dec_parm
+    templ_dict["parm_hist"] = parm_hist(increased, decreased)
+
+    if "Known_Act" in templ_dict:
+        if templ_dict["Trivial_Name"] == "":
+            templ_dict["Trivial_Name"] = "&mdash;"
+        if templ_dict["Known_Act"] == "":
+            templ_dict["Known_Act"] = "&mdash;"
+        t = Template(cprt.DETAILS_REF_ROW)
+        templ_dict["Reference"] = t.substitute(templ_dict)
+    else:
+        templ_dict["Reference"] = ""
+
     well = rec["Metadata_Well"]
     for ch in range(1, 6):
         im = load_image(image_dir, well, ch)
-        templ_dict["Img_{}_Cpd".format(ch)] = img_tag(im, style='width: 250px;')
+        templ_dict["Img_{}_Cpd".format(ch)] = img_tag(im, options='style="width: 250px;"')
         templ_dict["Img_{}_Ctrl".format(ch)] = ctrl_images[ch]
     if len(sim_refs) > 0:
         ref_tbl = sim_ref_table(sim_refs)
@@ -392,7 +459,8 @@ def detailed_report(rec, sim_refs, src_dir, ctrl_images):
     return report
 
 
-def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cutoff=0.6, highlight=False):
+def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cutoff=0.6,
+                act_cutoff=ACT_CUTOFF_PERC, highlight=False, mode="cpd"):
     overview_fn = op.join(report_name, "index.html")
     date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
     cpt.create_dirs(op.join(report_name, "details"))
@@ -407,8 +475,8 @@ def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cut
         title = plate
         header += "<h3>Plate {}</h3>\n".format(plate)
     header += "<p>({})</p>\n".format(date)
-    overview = header + overview_report(df, df_refs, cutoff=cutoff,
-                                        detailed_cpds=detailed_cpds, highlight=highlight)
+    overview = header + overview_report(df, df_refs, cutoff=cutoff, detailed_cpds=detailed_cpds,
+                                        highlight=highlight, mode=mode)
     write_page(overview, title=title, fn=overview_fn, templ=cprt.OVERVIEW_HTML_INTRO)
     # print(detailed_cpds)
     print("* creating detailed reports...")

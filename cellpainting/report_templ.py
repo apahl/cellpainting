@@ -56,7 +56,7 @@ th {
   border-style: solid;
   border-color: black;
   background-color: #94CAEF;
-  text-align: left;
+  text-align: center;
   font-weight: bold;
   padding: 5px;
 }
@@ -65,6 +65,7 @@ td {
   border-width:thin;
   border-style:solid;
   border-color:black;
+  text-align: center;
   padding: 5px;
 }
 th.noborder {
@@ -81,8 +82,26 @@ td.noborder {
   border-collapse:collapse;
   border-width:thin;
   border-style:solid;
+  text-align: left;
   border-color:white;
   padding: 5px;
+}
+th.left {
+    text-align: left;
+}
+td.left {
+    text-align: left;
+}
+img.cpd_image {
+    position: absolute;
+    left: 600px;
+    border: 1px solid #000000;
+    padding: 10px;
+}
+img.logo {
+    position: absolute;
+    right: 0px;
+    width: 300px;
 }
 </style>"""
 
@@ -132,7 +151,7 @@ function sortOverviewTable(col_no, ascending) {
 
 lpath = op.join(op.dirname(__file__), "../res/Comas3.jpg")
 logo = Image.open(lpath)
-LOGO = '<img style="float: right; width: 300px;" src="data:image/jpg;base64,{}" alt="Cell"/>'
+LOGO = '<img class="logo" src="data:image/jpg;base64,{}" alt="Logo"/>'
 LOGO = LOGO.format(b64_img(logo))
 
 TABLE_INTRO = """
@@ -176,24 +195,30 @@ OVERVIEW_TABLE_HEADER = """
 <tr>
     <th>Idx</th>
     <th>Mol</th>
-    <th><b onclick="sortOverviewTable(2, true)" title="sort ascending">&darr;</b>
-        <b onclick="sortOverviewTable(2, false)" title="sort descending">&uarr;</b><br>
-        Container_Id</th>
-    <th><b onclick="sortOverviewTable(3, true)" title="sort ascending">&darr;</b>
+    <th>Container_Id<br>
+        <b onclick="sortOverviewTable(2, true)" title="sort ascending">&darr;</b>
+        <b onclick="sortOverviewTable(2, false)" title="sort descending">&uarr;</b>
+    </th>
+    <th>Producer<br>
+        <b onclick="sortOverviewTable(3, true)" title="sort ascending">&darr;</b>
         <b onclick="sortOverviewTable(3, false)" title="sort descending">&uarr;</b><br>
-        Producer</th>
+    </th>
     <th>Activity<br>Flag</th>
-    <th><b onclick="sortOverviewTable(5, true)" title="sort ascending">&darr;</b>
+    <th>Induction [%]<br>
+        <b onclick="sortOverviewTable(5, true)" title="sort ascending">&darr;</b>
         <b onclick="sortOverviewTable(5, false)" title="sort descending">&uarr;</b><br>
-        Induction [%]</th>
-    <th><b onclick="sortOverviewTable(6, true)" title="sort ascending">&darr;</b>
+    </th>
+    <th>Highest Similarity<br>to a Reference [%]<br>
+        <b onclick="sortOverviewTable(6, true)" title="sort ascending">&darr;</b>
         <b onclick="sortOverviewTable(6, false)" title="sort descending">&uarr;</b><br>
-        Highest Similarity<br>to a Reference [%]</th>
+    </th>
     <th>Purity<br>Flag</th>
     <th>Toxic</th>
-    <th><b onclick="sortOverviewTable(9, true)" title="sort ascending">&darr;</b>
+    <th title="relative cell count in percent\nbased on the median cell count\nof the controls">
+        Cell Count<br>[%Ctrl]<br>
+        <b onclick="sortOverviewTable(9, true)" title="sort ascending">&darr;</b>
         <b onclick="sortOverviewTable(9, false)" title="sort descending">&uarr;</b><br>
-        Cell<br>Viability [%]</th>
+    </th>
     <th>Link to<br>Detailed Report</th>
 </tr>"""
 
@@ -204,11 +229,11 @@ OVERVIEW_TABLE_ROW = """
     <td title="Container_Id">$Container_Id</td>
     <td title="Producer">$Producer</td>
     <td title="Activity\nFlag" bgcolor=$Col_Act_Flag>$Act_Flag</td>
-    <td title="Activity [%]" bgcolor=$Col_Act>$Activity</td>
+    <td title="Induction [%]" bgcolor=$Col_Act>$Activity</td>
     <td title="Highest Similarity\nto a Reference [%]" bgcolor=$Col_Sim>$Max_Sim</td>
     <td title="Purity\nFlag" bgcolor=$Col_Purity>$Pure_Flag</td>
     <td title="Toxic" bgcolor=$Col_Toxic>$Toxic</td>
-    <td title="Cell\nViability [%]" bgcolor=$Col_Fitness>$Fitness</td>
+    <td title="Cell Count\n[%Ctrl]" bgcolor=$Col_Cell_Count>$Rel_Cell_Count</td>
     <td>$Link</td>
 </tr>"""
 
@@ -220,20 +245,20 @@ REF_TABLE_HEADER = """
 <tr>
     <th>Idx</th>
     <th>Mol</th>
-    <th>Container_Id</th>
-    <th>Similarity [%]</th>
+    <th>Container&nbsp;Id</th>
+    <th>Similarity&nbsp;[%]</th>
     <th>Trivial Name</th>
-    <th>Known Activity</th>
+    <th class="left">Known Activity</th>
 </tr>"""
 
 REF_TABLE_ROW = """
 <tr>
     <td>$idx</td>
-    <td><a href="../../references/$Container_Id.html">$mol_img</a></td>
+    <td><a href="../../references/details/$Container_Id.html">$mol_img</a></td>
     <td>$Container_Id</td>
     <td>$Sim_Format</td>
     <td>$Trivial_Name</td>
-    <td>$Known_Act</td>
+    <td class="left">$Known_Act</td>
 </tr>"""
 
 IMAGES_TABLE = """
@@ -246,7 +271,7 @@ IMAGES_TABLE = """
     <th>Nuclei</th>
 </tr>
 <tr>
-    <td align="center">C<br>o<br>m<br>p<br>o<br>u<br>n<br>d</td>
+    <td>C<br>o<br>m<br>p<br>o<br>u<br>n<br>d</td>
     <td>$Img_1_Cpd</td>
     <td>$Img_2_Cpd</td>
     <td>$Img_3_Cpd</td>
@@ -254,7 +279,7 @@ IMAGES_TABLE = """
     <td>$Img_5_Cpd</td>
 </tr>
 <tr>
-    <td align="center">C<br>o<br>n<br>t<br>r<br>o<br>l</td>
+    <td>C<br>o<br>n<br>t<br>r<br>o<br>l</td>
     <td>$Img_1_Ctrl</td>
     <td>$Img_2_Ctrl</td>
     <td>$Img_3_Ctrl</td>
@@ -264,38 +289,42 @@ IMAGES_TABLE = """
 
 INC_PARM_TABLE_HEADER = """
 <tr>
-    <th>Idx</th>
-    <th>Increased Parameter</th>
+    <th class="left">Idx</th>
+    <th class="left">Increased Parameter</th>
 </tr>"""
 
 DEC_PARM_TABLE_HEADER = """
 <tr>
     <th>Idx</th>
-    <th>Decreased Parameter</th>
+    <th class="left">Decreased Parameter</th>
 </tr>"""
 
 PARM_TABLE_ROW = """
 <tr>
     <td>$idx</td>
-    <td>$Parameter</td>
+    <td class="left">$Parameter</td>
 </tr>"""
+
+DETAILS_REF_ROW = """
+<tr><td class="noborder">Trivial<br>Name:</td><td class="noborder">$Trivial_Name</td></tr>
+<tr><td class="noborder">Known<br>Activity:</td><td class="noborder">$Known_Act</td></tr>"""
 
 DETAILS_TEMPL = """
 §LOGO
-<div>
-<div style="float: left; width: 400px;">
 <h1>Detailed Report</h1>
+<a href="http://oracle-server.mpi-dortmund.mpg.de:9944/perlbin/runjob.pl?_protocol=%7B5E6F1B34-70E1-88E4-1C51-71D239DAE9E1%7D&Compound_ID=$Compound_Id&Supplier_ID=&Alternate_ID=&IC50_view=False&Compound_level=True&Batch_level=False&__QuickRun=true">$mol_img</a>
 <h2>Compound Id $Compound_Id</h2>
 §TABLE_INTRO
-<tr><td class="noborder">Container Id:</td><td class="noborder">$Container_Id</td></tr>
+<tr>
+    <td class="noborder" width="100px">Container Id:</td>
+    <td class="noborder" width="400px">$Container_Id</td>
+</tr>
 <tr><td class="noborder">Producer:</td><td class="noborder">$Producer</td></tr>
-<tr><td class="noborder">Activity:</td><td class="noborder">$Activity %</td></tr>
+<tr><td class="noborder">Induction:</td><td class="noborder">$Activity %</td></tr>
 <tr><td class="noborder">Purity Flag:</td><td class="noborder">$Pure_Flag</td></tr>
-<tr><td class="noborder">Cell Viability:</td><td class="noborder">$Fitness %</td></tr>
+<tr><td class="noborder">Cell Count:</td><td class="noborder">$Rel_Cell_Count %Ctrl</td></tr>
+$Reference
 §TABLE_EXTRO
-</div>
-<p style='height: 220px;'><br><br><a href="http://oracle-server.mpi-dortmund.mpg.de:9944/perlbin/runjob.pl?_protocol=%7B5E6F1B34-70E1-88E4-1C51-71D239DAE9E1%7D&Compound_ID=$Compound_Id&Supplier_ID=&Alternate_ID=&IC50_view=False&Compound_level=True&Batch_level=False&__QuickRun=true">$mol_img</a></p>
-</div>
 <br>
 <br>
 <h3>Similar References</h3>
@@ -310,7 +339,13 @@ Sample images from site 5.
 §TABLE_EXTRO
 <br>
 <br>
-<h3>Parameters Increased Compared to Control</h3>
+<h3>Distribution of Active Parameters over Compartments</h3>
+<p>Relative occurrence of increased and decreased parameters (compared to control)<br>
+per cell compartment.</p>
+$parm_hist
+<br>
+<br>
+<h3>List of Increased Parameters (Compared to Control)</h3>
 §TABLE_INTRO
 §INC_PARM_TABLE_HEADER
 $Inc_Parm_Table
@@ -318,7 +353,7 @@ $Inc_Parm_Table
 <p></p>
 <br>
 <br>
-<h3>Parameters Decreased Compared to Control</h3>
+<h3>List of Decreased Parameters (Compared to Control)</h3>
 §TABLE_INTRO
 §DEC_PARM_TABLE_HEADER
 $Dec_Parm_Table

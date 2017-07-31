@@ -60,8 +60,9 @@ except ImportError:
 
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
-                    "Compound_Id", 'Container_Id', "Producer", "Pure_Flag", "Toxic", "Fitness",
-                    "Known_Act", "Trivial_Name", 'WellType', 'Conc_uM', "Activity", "Act_Profile", "Smiles"]
+                    "Compound_Id", 'Container_Id', "Producer", "Pure_Flag", "Toxic", "Rel_Cell_Count",
+                    "Known_Act", "Trivial_Name", 'WellType', 'Conc_uM', "Activity", "Act_Profile",
+                    "Plate", "Smiles"]
 DROP_FROM_NUMBERS = ['plateColumn', 'plateRow', 'Conc_uM', "Compound_Id"]
 DROP_GLOBAL = ["PathName_CellOutlines", "URL_CellOutlines", 'FileName_CellOutlines',
                'ImageNumber', 'Metadata_Site', 'Metadata_Site_1', 'Metadata_Site_2']
@@ -559,6 +560,7 @@ def join_layout_1536(df, layout_fn, quadrant, on="Address_384", sep="\t", how="i
     result[on] = quadrant[-1:] + result["Metadata_Well"]
     result = result.merge(layout, on=on, how=how)
     result.drop(on, axis=1, inplace=True)
+    result["Container_Id"] = result["Container_Id"] + "_" + result["Metadata_Well"]
     result = result.apply(pd.to_numeric, errors='ignore')
     return result
 
@@ -582,7 +584,7 @@ def join_smiles(df, df_smiles=None):
 def join_annotations(df):
     """Join Annotations from Compound_Id."""
     annotations = pd.read_csv(ANNOTATIONS, sep="\t")
-    annotations["Compound_Id"] = annotations["Compound_Id"].astype("int")
+    annotations = annotations.apply(pd.to_numeric, errors='ignore')
     result = df.merge(annotations, on="Compound_Id", how="left")
     result = result.replace(np.nan, "", regex=True)
     return result
@@ -612,7 +614,7 @@ def flag_toxic(df, cutoff=0.55):
     result = df.copy()
     median_cell_count_controls = df[df["WellType"] == "Control"]["Count_Cells"].median()
     result["Toxic"] = (result["Count_Cells"] < median_cell_count_controls * cutoff)
-    result["Fitness"] = (100 * (result["Count_Cells"] / median_cell_count_controls)).astype(int)
+    result["Rel_Cell_Count"] = (100 * (result["Count_Cells"] / median_cell_count_controls)).astype(int)
     return result
 
 
