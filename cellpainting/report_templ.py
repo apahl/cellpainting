@@ -761,7 +761,8 @@ REF_TABLE_HEADER = """
     <th>Idx</th>
     <th>Mol</th>
     <th>Container&nbsp;Id</th>
-    <th>Similarity&nbsp;[%]</th>
+    <th>Induction [%]</th>
+    <th title="Profile similarity to the compound shown on top.">Similarity&nbsp;[%]</th>
     <th>Trivial Name</th>
     <th class="left">Known Activity</th>
 </tr>"""
@@ -771,6 +772,7 @@ REF_TABLE_ROW = """
     <td>$idx</td>
     <td><a href="../../references/details/$link.html">$mol_img</a></td>
     <td>$Container_Id</td>
+    <td>$Activity</td>
     <td>$Sim_Format</td>
     <td>$Trivial_Name</td>
     <td class="left">$Known_Act</td>
