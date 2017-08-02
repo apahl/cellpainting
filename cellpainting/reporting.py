@@ -44,7 +44,7 @@ from IPython.core.display import HTML
 try:
     from misc_tools import apl_tools, comas_config
     AP_TOOLS = True
-    #: Library version
+    # Library version
     VERSION = apl_tools.get_commit(__file__)
     # I use this to keep track of the library versions I use in my project notebooks
     print("{:45s} (commit: {})".format(__name__, VERSION))
@@ -411,6 +411,8 @@ def parm_hist(increased, decreased):
     img_file = IO()
     plt.savefig(img_file, bbox_inches='tight', format="png")
     result = img_tag(img_file, format="png", options='style="width: 800px;"')
+    # important, otherwise the plots will accumulate and fill up memory:
+    plt.close()
     return result
 
 
