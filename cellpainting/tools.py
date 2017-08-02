@@ -24,18 +24,22 @@ STRUCT = "/home/pahl/comas/share/export_data_b64.csv.gz"
 KEEP = ['Compound_Id', "Batch_Id", "Producer", "Address", "Conc_uM", "Smiles", "Pure_Flag"]
 
 
-def profile_sim(current, reference):
-    """Calculate the similarity of two byte activity_profiles of the same length.
+try:
+    from .nim_ext import profile_sim
+    print("> loaded Nim extension.")
+except ImportError:
+    def profile_sim(current, reference):
+        """Calculate the similarity of two byte activity_profiles of the same length.
 
-    Returns value between 0 .. 1"""
+        Returns value between 0 .. 1"""
 
-    ref_len = len(reference)
-    assert ref_len == len(current), "Activity Profiles must have the same length to be compared."
-    matching_bytes = 0
-    for idx in range(ref_len):
-        if current[idx] == reference[idx]:
-            matching_bytes += 1
-    return matching_bytes / ref_len
+        ref_len = len(reference)
+        assert ref_len == len(current), "Activity Profiles must have the same length to be compared."
+        matching_bytes = 0
+        for idx in range(ref_len):
+            if current[idx] == reference[idx]:
+                matching_bytes += 1
+        return matching_bytes / ref_len
 
 
 def format_well(well):

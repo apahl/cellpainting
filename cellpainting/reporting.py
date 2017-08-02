@@ -33,7 +33,8 @@ from . import report_templ as cprt
 from . import processing as cpp
 from .config import (ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC,
                      LIMIT_ACTIVITY_H, LIMIT_ACTIVITY_L,
-                     LIMIT_CELL_COUNT_H, LIMIT_CELL_COUNT_L)
+                     LIMIT_CELL_COUNT_H, LIMIT_CELL_COUNT_L,
+                     LIMIT_SIMILARITY_H, LIMIT_SIMILARITY_L)
 
 Draw.DrawingOptions.atomLabelFontFace = "DejaVu Sans"
 Draw.DrawingOptions.atomLabelFontSize = 18
@@ -65,11 +66,6 @@ try:
 except ImportError:
     print("  * Avalon not available. Using RDKit for 2d coordinate generation.")
     USE_AVALON_2D = False
-
-COL_WHITE = "#ffffff"
-COL_GREEN = "#ccffcc"
-COL_YELLOW = "#ffffcc"
-COL_RED = "#ffcccc"
 
 
 def check_2d_coords(mol, force=False):
@@ -212,51 +208,52 @@ def write_page(page, title="Report", fn="index.html", templ=cprt.HTML_INTRO):
 def assign_colors(rec):
     if "Toxic" in rec:
         if rec["Toxic"]:
-            rec["Col_Toxic"] = COL_RED
+            rec["Col_Toxic"] = cprt.COL_RED
         else:
-            rec["Col_Toxic"] = COL_GREEN
+            rec["Col_Toxic"] = cprt.COL_GREEN
     else:
-        rec["Col_Toxic"] = COL_WHITE
+        rec["Col_Toxic"] = cprt.COL_WHITE
 
     if "Pure_Flag" in rec:
         if rec["Pure_Flag"] == "Ok":
-            rec["Col_Purity"] = COL_GREEN
+            rec["Col_Purity"] = cprt.COL_GREEN
         elif rec["Pure_Flag"] == "Warn":
-            rec["Col_Purity"] = COL_YELLOW
+            rec["Col_Purity"] = cprt.COL_YELLOW
         elif rec["Pure_Flag"] == "Fail":
-            rec["Col_Purity"] = COL_RED
+            rec["Col_Purity"] = cprt.COL_RED
         else:
-            rec["Col_Purity"] = COL_WHITE
+            rec["Col_Purity"] = cprt.COL_WHITE
     else:
-        rec["Col_Purity"] = COL_WHITE
+        rec["Col_Purity"] = cprt.COL_WHITE
 
     if rec["Rel_Cell_Count"] >= LIMIT_CELL_COUNT_H:
-        rec["Col_Cell_Count"] = COL_GREEN
+        rec["Col_Cell_Count"] = cprt.COL_GREEN
     elif rec["Rel_Cell_Count"] >= LIMIT_CELL_COUNT_L:
-        rec["Col_Cell_Count"] = COL_YELLOW
+        rec["Col_Cell_Count"] = cprt.COL_YELLOW
     else:
-        rec["Cell_Count"] = COL_RED
+        rec["Col_Cell_Count"] = cprt.COL_RED
 
     if rec["Activity"] >= LIMIT_ACTIVITY_H:
-        rec["Col_Act"] = COL_GREEN
+        rec["Col_Act"] = cprt.COL_GREEN
     elif rec["Activity"] >= LIMIT_ACTIVITY_L:
-        rec["Col_Act"] = COL_YELLOW
+        rec["Col_Act"] = cprt.COL_YELLOW
     else:
-        rec["Col_Act"] = COL_RED
+        rec["Col_Act"] = cprt.COL_RED
 
     if rec["Act_Flag"] == "active":
-        rec["Col_Act_Flag"] = COL_GREEN
+        rec["Col_Act_Flag"] = cprt.COL_GREEN
     else:
-        rec["Col_Act_Flag"] = COL_RED
+        rec["Col_Act_Flag"] = cprt.COL_RED
 
 
 def remove_colors(rec):
     for k in rec.keys():
         if k.startswith("Col_"):
-            rec[k] = COL_WHITE
+            rec[k] = cprt.COL_WHITE
 
 
-def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=False, mode="cpd"):
+def overview_report(df, df_refs=None, cutoff=LIMIT_SIMILARITY_L / 100,
+                    detailed_cpds=None, highlight=False, mode="cpd"):
     """detailed_cpds = {Compound_Id: [{"Compound_Id": Sim_Ref_Id with highest Similarity, "Trivial_Name": ...,
     "Similarity": ..., "Known_Act": ..., "Smiles": ...},
     {{"Compound_Id": Sim_Ref_Id with next highest Similarity, "Tr...}]}"""
@@ -284,13 +281,13 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
             has_details = False
             rec["Max_Sim"] = ""
             rec["Link"] = ""
-            rec["Col_Sim"] = COL_WHITE
+            rec["Col_Sim"] = cprt.COL_WHITE
         if rec["Activity"] < act_cutoff:
             has_details = False
             rec["Act_Flag"] = "inactive"
             rec["Max_Sim"] = ""
             rec["Link"] = ""
-            rec["Col_Sim"] = COL_WHITE
+            rec["Col_Sim"] = cprt.COL_WHITE
         # print(rec)
         assign_colors(rec)
         convert_bool(rec, "Toxic")
@@ -304,16 +301,16 @@ def overview_report(df, df_refs=None, cutoff=0.6, detailed_cpds=None, highlight=
             if "ref" in mode:
                 sim_refs.drop(sim_refs.head(1).index, inplace=True)
             if sim_refs.shape[0] == 0:
-                rec["Max_Sim"] = "< {}".format(cutoff * 100)
-                rec["Col_Sim"] = COL_RED
+                rec["Max_Sim"] = "< {}".format(LIMIT_SIMILARITY_L)
+                rec["Col_Sim"] = cprt.COL_RED
             else:
                 sim_refs = sim_refs.fillna("&mdash;")
                 max_sim = sim_refs["Similarity"].max() * 100
                 rec["Max_Sim"] = "{:.1f}".format(max_sim)
-                if max_sim >= 80:
-                    rec["Col_Sim"] = COL_GREEN
-                elif max_sim >= cutoff * 100:
-                    rec["Col_Sim"] = COL_YELLOW
+                if max_sim >= LIMIT_SIMILARITY_H:
+                    rec["Col_Sim"] = cprt.COL_GREEN
+                elif max_sim >= LIMIT_SIMILARITY_L:
+                    rec["Col_Sim"] = cprt.COL_YELLOW
             details_fn = sanitize_filename(rec["Container_Id"])
             rec["Link"] = '<a href="details/{}.html">Detailed<br>Report</a>'.format(details_fn)
             if detailed_cpds is not None:
@@ -338,6 +335,9 @@ def sim_ref_table(sim_refs):
         rec["Sim_Format"] = "{:.1f}".format(rec["Similarity"] * 100)
         rec["mol_img"] = mol_img_tag(mol)
         rec["idx"] = idx
+
+        link = sanitize_filename(rec["Container_Id"])
+        rec["link"] = link
         row = templ.substitute(rec)
         table.append(row)
     table.append(cprt.TABLE_EXTRO)
@@ -432,7 +432,6 @@ def detailed_report(rec, sim_refs, src_dir, ctrl_images):
     templ_dict["Inc_Parm_Table"] = inc_parm
     templ_dict["Dec_Parm_Table"] = dec_parm
     templ_dict["parm_hist"] = parm_hist(increased, decreased)
-
     if "Known_Act" in templ_dict:
         if templ_dict["Trivial_Name"] == "":
             templ_dict["Trivial_Name"] = "&mdash;"
@@ -475,8 +474,13 @@ def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cut
         title = plate
         header += "<h3>Plate {}</h3>\n".format(plate)
     header += "<p>({})</p>\n".format(date)
+    if highlight:
+        highlight_legend = cprt.HIGHLIGHT_LEGEND
+    else:
+        highlight_legend = ""
+
     overview = header + overview_report(df, df_refs, cutoff=cutoff, detailed_cpds=detailed_cpds,
-                                        highlight=highlight, mode=mode)
+                                        highlight=highlight, mode=mode) + highlight_legend
     write_page(overview, title=title, fn=overview_fn, templ=cprt.OVERVIEW_HTML_INTRO)
     # print(detailed_cpds)
     print("* creating detailed reports...")

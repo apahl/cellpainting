@@ -4,6 +4,9 @@ doc/_build/
 cellpainting/test.html
 cellpainting/test.js
 cellpainting/temp.py
+cellpainting/nim_ext.so
+nim_ext/nim_ext.so
+nim_ext/pmgen/
 *.pkl
 *.png
 *.mrv

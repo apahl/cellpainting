@@ -565,6 +565,12 @@ def join_layout_1536(df, layout_fn, quadrant, on="Address_384", sep="\t", how="i
     return result
 
 
+def merge_update(df1, df2, on="Container_Id"):
+    result = df1.append(df2, ignore_index=True)
+    result = result.drop_duplicates(subset=on, keep="last")
+    return result
+
+
 def join_smiles(df, df_smiles=None):
     """Join Smiles from Compound_Id."""
     keep = ['Compound_Id', "Producer", "Smiles", "Pure_Flag"]
