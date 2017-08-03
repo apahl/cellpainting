@@ -125,13 +125,17 @@ class DataSet():
         result.print_log("head")
         return result
 
+
     def drop_cols(self, cols, inplace=False):
+        """Drops the list of columns from the DataFrame.
+        Listed columns that are not present in the DataFrame are simply ignored
+        (no error is thrown)."""
         if inplace:
-            self.data.drop(cols, axis=1, inplace=True)
+            drop_cols(self.data, cols, inplace=True)
             self.print_log("drop cols (inplace)")
         else:
             result = DataSet()
-            result.data = self.data.drop(cols, axis=1, inplace=False)
+            result.data = drop_cols(self.data, cols, inplace=False)
             result.print_log("drop cols")
             return result
 
@@ -505,9 +509,12 @@ def well_type_from_position(df):
     return result
 
 
-def drop_if_present(df, candidates, inplace=False):
+def drop_cols(df, cols, inplace=False):
+    """Drops the list of columns from the DataFrame.
+    Listed columns that are not present in the DataFrame are simply ignored
+    (no error is thrown)."""
     df_keys = df.keys()
-    drop = [k for k in candidates if k in df_keys]
+    drop = [k for k in cols if k in df_keys]
     if inplace:
         df.drop(drop, axis=1, inplace=True)
     else:
@@ -550,7 +557,7 @@ def join_layout_384(df, layout_fn, on="Address"):
 def get_cpd_from_container(df):
     result = pd.concat([df, df["Container_Id"].str.split(":", expand=True)], axis=1)
     result.rename(columns={0: "Compound_Id"}, inplace=True)
-    drop_if_present(result, [1, 2, 3, 4], inplace=True)
+    drop_cols(result, [1, 2, 3, 4], inplace=True)
     return result
 
 
@@ -572,7 +579,7 @@ def join_layout_1536(df, layout, plate, quadrant, on="Address_384", sep="\t", ho
     if "Conc" in layout.keys():
         layout.rename(columns={"Conc": "Conc_uM"}, inplace=True)
     layout = get_cpd_from_container(layout)
-    drop_if_present(layout, drop, inplace=True)
+    drop_cols(layout, drop, inplace=True)
     result[on] = plate + "." + quadrant[-1:] + result["Metadata_Well"]
     result = result.merge(layout, on=on, how=how)
     result.drop(on, axis=1, inplace=True)
