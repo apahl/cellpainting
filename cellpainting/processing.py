@@ -50,6 +50,7 @@ try:
     COMAS = comas_config.COMAS
     ANNOTATIONS = comas_config.ANNOTATIONS
     REFERENCES = comas_config.REFERENCES
+    LAYOUTS = comas_config.LAYOUTS
 
 except ImportError:
     AP_TOOLS = False
@@ -57,6 +58,7 @@ except ImportError:
     COMAS = ""
     ANNOTATIONS = ""
     REFERENCES = ""
+    LAYOUTS = ""
 
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
@@ -228,14 +230,14 @@ class DataSet():
         return result
 
 
-    def join_layout_1536(self, layout_fn, plate, on="Address_384", how="inner"):
+    def join_layout_1536(self, layout, plate, quadrant, on="Address_384", how="inner"):
         """Cell Painting is always run in 384er plates.
         COMAS standard screening plates are format 1536.
         With this function, the 1536-to-384 reformatting file
         with the smiles added by join_smiles_to_layout_1536()
         can be used directly to join the layout to the individual 384er plates."""
         result = DataSet(log=self.log)
-        result.data = join_layout_1536(self.data, layout_fn, plate, on=on, how=how)
+        result.data = join_layout_1536(self.data, layout, plate, quadrant, on=on, how=how)
         result.print_log("join layout 1536")
         return result
 
@@ -485,7 +487,7 @@ def load_pkl(fn):
     return result
 
 
-def read_smiles_file(fn, props=['Compound_Id', "Producer", "Smiles", "Pure_Flag"]):
+def read_smiles_file(fn, props=['Compound_Id', "Smiles", "Pure_Flag"]):
     """Read in the file with the Compound_Ids and the Simles.
     Return a DataFrame for fast access."""
     result = pd.read_csv(fn, sep="\t")
@@ -501,6 +503,16 @@ def well_type_from_position(df):
     result["WellType"] = "Compound"
     result["WellType"][(result["plateColumn"] == 11) | (result["plateColumn"] == 12)] = "Control"
     return result
+
+
+def drop_if_present(df, candidates, inplace=False):
+    df_keys = df.keys()
+    drop = [k for k in candidates if k in df_keys]
+    if inplace:
+        df.drop(drop, axis=1, inplace=True)
+    else:
+        result = df.drop(drop, axis=1)
+        return result
 
 
 def well_from_position(df, well_name="Metadata_Well",
@@ -538,11 +550,11 @@ def join_layout_384(df, layout_fn, on="Address"):
 def get_cpd_from_container(df):
     result = pd.concat([df, df["Container_Id"].str.split(":", expand=True)], axis=1)
     result.rename(columns={0: "Compound_Id"}, inplace=True)
-    result.drop([1])
+    drop_if_present(result, [1, 2, 3, 4], inplace=True)
     return result
 
 
-def join_layout_1536(df, layout_fn, quadrant, on="Address_384", sep="\t", how="inner"):
+def join_layout_1536(df, layout, plate, quadrant, on="Address_384", sep="\t", how="inner"):
     """Cell Painting is always run in 384er plates.
     COMAS standard screening plates are format 1536.
     With this function, the 1536-to-384 reformatting file
@@ -550,14 +562,18 @@ def join_layout_1536(df, layout_fn, quadrant, on="Address_384", sep="\t", how="i
     can be used directly to join the layout to the individual 384er plates."""
     if not isinstance(quadrant, str):
         quadrant = str(quadrant)
+    drop = ["Plate_name_384", "Plate_name_1536", "Address_1536", "Index", 1, 2]
     result = df.copy()
-    layout = pd.read_csv(layout_fn, sep=sep)
-    layout[on] = layout["Plate_name_384"].str[-1:] + layout[on]
-    layout.rename(columns={"Container_ID_1536": "Container_Id"}, inplace=True)
+    layout = cpt.check_df(layout, LAYOUTS)
+    layout = layout.copy()
+    layout[on] = layout["Plate_name_384"] + layout[on]
+    if "Container_ID_1536" in layout.keys():
+        layout.rename(columns={"Container_ID_1536": "Container_Id"}, inplace=True)
+    if "Conc" in layout.keys():
+        layout.rename(columns={"Conc": "Conc_uM"}, inplace=True)
     layout = get_cpd_from_container(layout)
-    drop = ["Plate_name_384", "Plate_name_1536", "Address_1536", "Index"]
-    layout.drop(drop, axis=1, inplace=True)
-    result[on] = quadrant[-1:] + result["Metadata_Well"]
+    drop_if_present(layout, drop, inplace=True)
+    result[on] = plate + "." + quadrant[-1:] + result["Metadata_Well"]
     result = result.merge(layout, on=on, how=how)
     result.drop(on, axis=1, inplace=True)
     result["Container_Id"] = result["Container_Id"] + "_" + result["Metadata_Well"]

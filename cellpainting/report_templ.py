@@ -679,6 +679,7 @@ OVERVIEW_TABLE_HEADER = """
     <th>Idx</th>
     <th>Mol</th>
     <th>Container_Id</th>
+    <th>Conc [&micro;M]</th>
     <th>Producer</th>
     <th>Activity<br>Flag</th>
     <th>Induction [%]</th>
@@ -695,6 +696,7 @@ OVERVIEW_TABLE_ROW = """
     <td>$idx</td>
     <td><a href="http://oracle-server.mpi-dortmund.mpg.de:9944/perlbin/runjob.pl?_protocol=%7B5E6F1B34-70E1-88E4-1C51-71D239DAE9E1%7D&Compound_ID=$Compound_Id&Supplier_ID=&Alternate_ID=&IC50_view=False&Compound_level=True&Batch_level=False&__QuickRun=true">$mol_img</a></td>
     <td title="Container_Id">$Container_Id</td>
+    <td title="Concentration">${Conc_uM}</td>
     <td title="Producer">$Producer</td>
     <td title="Activity\nFlag" bgcolor=$Col_Act_Flag>$Act_Flag</td>
     <td title="Induction [%]" bgcolor=$Col_Act>$Activity</td>
@@ -761,6 +763,7 @@ REF_TABLE_HEADER = """
     <th>Idx</th>
     <th>Mol</th>
     <th>Container&nbsp;Id</th>
+    <th>Conc [&micro;M]</th>
     <th>Induction [%]</th>
     <th title="Profile similarity to the compound shown on top.">Similarity&nbsp;[%]</th>
     <th>Trivial Name</th>
@@ -772,6 +775,7 @@ REF_TABLE_ROW = """
     <td>$idx</td>
     <td><a href="../../references/details/$link.html">$mol_img</a></td>
     <td>$Container_Id</td>
+    <td>${Conc_uM}</td>
     <td>$Activity</td>
     <td>$Sim_Format</td>
     <td>$Trivial_Name</td>
@@ -836,6 +840,7 @@ DETAILS_TEMPL = """
     <td class="noborder" width="100px">Container Id:</td>
     <td class="noborder" width="400px">$Container_Id</td>
 </tr>
+<tr><td class="noborder">Conc:</td><td class="noborder">${Conc_uM} &micro;M</td></tr>
 <tr><td class="noborder">Producer:</td><td class="noborder">$Producer</td></tr>
 <tr><td class="noborder">Induction:</td><td class="noborder">$Activity %</td></tr>
 <tr><td class="noborder">Purity Flag:</td><td class="noborder">$Pure_Flag</td></tr>

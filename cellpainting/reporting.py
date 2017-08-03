@@ -143,7 +143,12 @@ def load_image(path, well, channel):
 
 def b64_mol(mol, size=300):
     img_file = IO()
-    img = autocrop(Draw.MolToImage(mol, size=(size, size)))
+    try:
+        img = autocrop(Draw.MolToImage(mol, size=(size, size)))
+    except UnicodeEncodeError:
+        print(Chem.MolToSmiles(mol))
+        mol = Chem.MolFromSmiles("C")
+        img = autocrop(Draw.MolToImage(mol, size=(size, size)))
     img.save(img_file, format='PNG')
     b64 = base64.b64encode(img_file.getvalue())
     b64 = b64.decode()
