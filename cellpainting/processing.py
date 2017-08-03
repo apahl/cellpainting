@@ -153,10 +153,7 @@ class DataSet():
 
     def print_log(self, component, add_info=""):
         if self.log:
-            component = component + ":"
-            if len(add_info) > 0:
-                add_info = "    ({})".format(add_info)
-            print("{:22s} ({:4d} | {:4d}){}".format(component, self.shape[0], self.shape[1], add_info))
+            print_log(self.data, component, add_info)
 
 
     def load(self, fn, sep="\t"):
@@ -489,6 +486,13 @@ def load_pkl(fn):
     result.data = pd.read_pickle(fn)
     result.print_log("load pickle")
     return result
+
+
+def print_log(df, component, add_info=""):
+    component = component + ":"
+    if len(add_info) > 0:
+        add_info = "    ({})".format(add_info)
+    print("{:22s} ({:4d} | {:4d}){}".format(component, df.shape[0], df.shape[1], add_info))
 
 
 def read_smiles_file(fn, props=['Compound_Id', "Smiles", "Pure_Flag"]):
