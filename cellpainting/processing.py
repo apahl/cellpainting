@@ -811,9 +811,11 @@ def activity_profile(df, mad_mult=3.5, parameters=ACT_PROF_PARAMETERS, only_fina
     result["Act_Profile"] = result[act_parameters].astype(str).apply(lambda x: "".join(x), axis=1)
 
     if only_final:
+        drop = []
         for k in result.keys():
             if k not in FINAL_PARAMETERS:
-                result.drop(k, axis=1, inplace=True)
+                drop.append(k)
+        result.drop(drop, axis=1, inplace=True)
     result = result.round(decimals)
     return result
 
