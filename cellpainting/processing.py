@@ -31,6 +31,7 @@ import glob
 import os.path as op
 from collections import Counter
 import xml.etree.ElementTree as ET
+import pickle
 
 import pandas as pd
 import numpy as np
@@ -38,7 +39,7 @@ import numpy as np
 from IPython.core.display import HTML
 
 from . import tools as cpt
-from .config import ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC
+from .config import ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC, LIMIT_SIMILARITY_L
 
 try:
     from misc_tools import apl_tools, comas_config
@@ -50,6 +51,7 @@ try:
     COMAS = comas_config.COMAS
     ANNOTATIONS = comas_config.ANNOTATIONS
     REFERENCES = comas_config.REFERENCES
+    SIM_REFS = comas_config.SIM_REFS
     LAYOUTS = comas_config.LAYOUTS
 
 except ImportError:
@@ -58,6 +60,7 @@ except ImportError:
     COMAS = ""
     ANNOTATIONS = ""
     REFERENCES = ""
+    SIM_REFS = ""
     LAYOUTS = ""
 
 
@@ -419,22 +422,21 @@ class DataSet():
         return result
 
 
+    def update_similar_refs(self, df_refs=REFERENCES, mode="cpd"):
+        """Find similar compounds in references and update the export file.
+        The export file of the dict object is in pkl format. In addition,
+        a tsv file (or maybe JSON?) is written for use in PPilot.
+        This method dpes not return anything, it just writes the result to fle."""
+        self.print_log("update similar")
+        update_similar_refs(self.data, df_refs=df_refs, mode=mode)
+
+
     def find_similar(self, act_profile, cutoff=0.9, max_num=5):
         """Filter the dataframe for activity profiles similar to the given one.
         `cutoff` gives the similarity threshold, default is 0.9."""
         result = DataSet()
         result.data = find_similar(self.data, act_profile=act_profile, cutoff=cutoff, max_num=max_num)
         result.print_log("find similar")
-        return result
-
-
-    def find_similar_in_refs(self, cpd_ids=None, df_refs=None, cutoff=0.6, max_num=5, sep="\t"):
-        """Find and add references with similar activity profiles to the dataframe
-        `cutoff` gives the similarity threshold, default is 0.6."""
-        result = DataSet()
-        result.data = find_similar_in_refs(self.data, cpd_ids=cpd_ids, df_refs=df_refs,
-                                           cutoff=cutoff, max_num=max_num, sep=sep)
-        # result.print_log("find similar")
         return result
 
 
@@ -983,48 +985,57 @@ def find_similar(df, act_profile, cutoff=0.6, max_num=3):
     return result
 
 
-def find_similar_in_refs(df, cpd_ids=None, df_refs=None, cutoff=0.6, max_num=5, sep="\t"):
-    """Find and add references with similar activity profiles to the dataframe
-    `cutoff` gives the similarity threshold, default is 0.6."""
-    ds_refs = DataSet()
-    df_refs = cpt.check_df(df_refs, REFERENCES)
-    ds_refs.data = df_refs.replace(np.nan, "", regex=True)
-    if cpd_ids is None:
-        cpd_ids = list(df["Compound_Id"])
-    df_cpds = df[df["Compound_Id"].isin(cpd_ids)]
-    result = {"Compound_Id": [], "Producer": [], "Activity": [], "Similar_Ref": [], "Similarity": [],
-              "Trivial_Name": [], "Known_Act": [], "Act_Flag": []}
-    for _, rec in df_cpds.iterrows():
-        if rec["Activity"] < ACT_CUTOFF_PERC:
-            result["Compound_Id"].append(rec["Compound_Id"])
-            result["Producer"].append(rec["Producer"])
-            result["Activity"].append(rec["Activity"])
-            result["Act_Flag"].append("InAct")
-            for k in ["Similar_Ref", "Similarity", "Known_Act", "Trivial_Name"]:
-                result[k].append("")
+def write_obj(obj, fn):
+    """Save a generic python object through pickling."""
+    with open(fn, "wb") as f:
+        pickle.dump(obj, f)
+
+
+def load_obj(fn=SIM_REFS):
+    with open(fn, "rb") as f:
+        obj = pickle.load(f)
+    return obj
+
+
+def update_similar_refs(df, df_refs=REFERENCES, sim_refs=None, mode="cpd", write=True):
+    """Find similar compounds in references and update the export file.
+    The export file of the dict object is in pkl format. In addition,
+    a tsv file (or maybe JSON?) is written for use in PPilot.
+    `mode` can be "cpd" or "ref". if `sim_refs`is not None,
+    it has to be a dict of the correct format.
+    With `write=False`, the writing of the file can be deferred to the end of the processing pipeline,
+        # but has to be done manually, then, with `write_obj(sim_refs_dict, SIM_REFS)`."""
+    # TODO: can PPilot handle JSON format?
+    sim_fn = SIM_REFS
+    df_refs = cpt.check_df(df_refs, REFERENCES)  # the file with the annotated references
+    if sim_refs is None:
+        try:
+            sim_refs = load_obj(sim_fn)
+        except FileNotFoundError:
+            print("* No similar refs file was found. Generating a new one.")
+            sim_refs = {}
+
+    for _, rec in df.iterrows():
+        if rec["Activity"] < ACT_CUTOFF_PERC or rec["Toxic"]:
+            # no similarites for inactive or toxic compounds
+            continue
+        act_profile = rec["Act_Profile"]
+        max_num = 5
+        if "ref" in mode:
+            max_num += 1
+        similar = find_similar(df_refs, act_profile, cutoff=LIMIT_SIMILARITY_L / 100, max_num=max_num)
+        similar = similar[["Container_Id", "Similarity"]]
+        if "ref" in mode:
+            similar.drop(similar.head(1).index, inplace=True)
+        if similar.shape[0] == 0:
+            ref_dict = {}
         else:
-            act_prof = rec["Act_Profile"]
-            sim_refs = ds_refs.find_similar(act_prof, cutoff=cutoff, max_num=max_num)
-            if sim_refs.shape[0] > 0:
-                for _, ref in sim_refs.iterrows():
-                    result["Compound_Id"].append(rec["Compound_Id"])
-                    result["Producer"].append(rec["Producer"])
-                    result["Activity"].append(rec["Activity"])
-                    result["Act_Flag"].append("Active")
-                    result["Similar_Ref"].append(ref["Compound_Id"])
-                    result["Similarity"].append(ref["Similarity"])
-                    result["Trivial_Name"].append(ref["Trivial_Name"])
-                    result["Known_Act"].append(ref["Known_Act"])
-            else:
-                result["Compound_Id"].append(rec["Compound_Id"])
-                result["Producer"].append(rec["Producer"])
-                result["Activity"].append(rec["Activity"])
-                result["Act_Flag"].append("Active")
-                result["Similar_Ref"].append("None")
-                result["Similarity"].append("None")
-                result["Trivial_Name"].append("")
-                result["Known_Act"].append("")
-    return pd.DataFrame(result)
+            ref_dict = similar.to_dict("list")
+        sim_refs[rec["Container_Id"]] = ref_dict
+    if write:
+        # with write=False, the writing can be deferred to the end of the processing pipeline,
+        # but has to be done manually, then.
+        write_obj(sim_refs, sim_fn)
 
 
 def cpd_similarity(df1, cpd1, df2, cpd2):

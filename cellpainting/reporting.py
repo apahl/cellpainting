@@ -7,12 +7,7 @@ Reporting
 
 *Created on Thu Jun  8 14:40 2017 by A. Pahl*
 
-Tools for creating HTML Reports.
-&#8593;&uarr;  &#8595;&darr;
-
-<a href="http://oracle-server.mpi-dortmund.mpg.de:9944/perlbin/runjob.pl?_protocol=%7B5E6F1B34-70E1-88E4-1C51-71D239DAE9E1%7D&Compound_ID=$Compound_Id&Supplier_ID=&Alternate_ID=&IC50_view=False&Compound_level=True&Batch_level=False&__QuickRun=true">
-COMPOUND IMAGE
-</a>"""
+Tools for creating HTML Reports."""
 
 import time
 import base64
@@ -51,6 +46,7 @@ try:
     COMAS = comas_config.COMAS
     ANNOTATIONS = comas_config.ANNOTATIONS
     REFERENCES = comas_config.REFERENCES
+    SIM_REFS = comas_config.SIM_REFS
 
 except ImportError:
     AP_TOOLS = False
@@ -58,6 +54,7 @@ except ImportError:
     COMAS = ""
     ANNOTATIONS = ""
     REFERENCES = ""
+    SIM_REFS = ""
 
 try:
     # Try to import Avalon so it can be used for generation of 2d coordinates.
@@ -257,11 +254,12 @@ def remove_colors(rec):
             rec[k] = cprt.COL_WHITE
 
 
-def overview_report(df, df_refs=None, cutoff=LIMIT_SIMILARITY_L / 100,
-                    detailed_cpds=None, highlight=False, mode="cpd"):
+def overview_report(df, df_refs=None, sim_refs=SIM_REFS, cutoff=LIMIT_SIMILARITY_L / 100,
+                    highlight=False, mode="cpd"):
     """detailed_cpds = {Compound_Id: [{"Compound_Id": Sim_Ref_Id with highest Similarity, "Trivial_Name": ...,
     "Similarity": ..., "Known_Act": ..., "Smiles": ...},
     {{"Compound_Id": Sim_Ref_Id with next highest Similarity, "Tr...}]}"""
+    detailed_cpds = []
     if isinstance(df, cpp.DataSet):
         df = df.data
     if "ref" in mode:
@@ -269,6 +267,8 @@ def overview_report(df, df_refs=None, cutoff=LIMIT_SIMILARITY_L / 100,
     else:
         act_cutoff = ACT_CUTOFF_PERC
     df_refs = cpt.check_df(df_refs, REFERENCES)
+    if isinstance(sim_refs, str):
+        sim_refs = cpp.load_obj(sim_refs)
     report = [cprt.OVERVIEW_TABLE_INTRO, cprt.OVERVIEW_TABLE_HEADER]
     row_templ = Template(cprt.OVERVIEW_TABLE_ROW)
     idx = 0
@@ -298,44 +298,48 @@ def overview_report(df, df_refs=None, cutoff=LIMIT_SIMILARITY_L / 100,
         convert_bool(rec, "Toxic")
 
         if has_details:
-            act_profile = rec["Act_Profile"]
-            max_num = 5
-            if "ref" in mode:
-                max_num += 1
-            sim_refs = cpp.find_similar(df_refs, act_profile, cutoff=cutoff, max_num=max_num)
-            if "ref" in mode:
-                sim_refs.drop(sim_refs.head(1).index, inplace=True)
-            if sim_refs.shape[0] == 0:
-                rec["Max_Sim"] = "< {}".format(LIMIT_SIMILARITY_L)
-                rec["Col_Sim"] = cprt.COL_RED
+            c_id = rec["Container_Id"]
+            detailed_cpds.append(c_id)
+            if c_id in sim_refs:
+                similar = sim_refs[c_id]
+                if len(similar) > 0:
+                    max_sim = similar["Similarity"][0] * 100  # first in the list has the highest similarity
+                    rec["Max_Sim"] = max_sim
+                    if max_sim >= LIMIT_SIMILARITY_H:
+                        rec["Col_Sim"] = cprt.COL_GREEN
+                    elif max_sim >= LIMIT_SIMILARITY_L:
+                        rec["Col_Sim"] = cprt.COL_YELLOW
+                    else:
+                        rec["Col_Sim"] = cprt.COL_WHITE
+                        print("ERROR: This should not happen (Max_Sim).")
+                else:
+                    rec["Max_Sim"] = "< {}".format(LIMIT_SIMILARITY_L)
+                    rec["Col_Sim"] = cprt.COL_RED
             else:
-                sim_refs = sim_refs.fillna("&mdash;")
-                max_sim = sim_refs["Similarity"].max() * 100
-                rec["Max_Sim"] = "{:.1f}".format(max_sim)
-                if max_sim >= LIMIT_SIMILARITY_H:
-                    rec["Col_Sim"] = cprt.COL_GREEN
-                elif max_sim >= LIMIT_SIMILARITY_L:
-                    rec["Col_Sim"] = cprt.COL_YELLOW
-            details_fn = sanitize_filename(rec["Container_Id"])
+                rec["Max_Sim"] = ""
+                rec["Col_Sim"] = cprt.COL_WHITE
+
+            details_fn = sanitize_filename(c_id)
             rec["Link"] = '<a href="details/{}.html">Detailed<br>Report</a>'.format(details_fn)
-            if detailed_cpds is not None:
-                detailed_cpds[rec["Container_Id"]] = []
-                for _, ref in sim_refs.iterrows():
-                    ref_dict = dict(ref)
-                    detailed_cpds[rec["Container_Id"]].append(ref_dict)
         if not highlight:
             # remove all coloring again:
             remove_colors(rec)
         report.append(row_templ.substitute(rec))
     report.append(cprt.TABLE_EXTRO)
-    return "\n".join(report)
+    return "\n".join(report), detailed_cpds
 
 
-def sim_ref_table(sim_refs):
+def sim_ref_table(df_refs, similar):
     table = [cprt.TABLE_INTRO, cprt.REF_TABLE_HEADER]
     templ = Template(cprt.REF_TABLE_ROW)
-    for idx, sim_ref in enumerate(sim_refs, 1):
-        rec = sim_ref.copy()
+    for idx in range(len(similar["Container_Id"])):
+        rec = {}
+        container_id = similar["Container_Id"][idx]
+        rec["Container_Id"] = container_id
+        rec["Similarity"] = similar["Similarity"][idx]
+        ref_data = df_refs[df_refs["Container_Id"] == container_id]
+        ref_data = ref_data.fillna("&mdash;")
+        rec.update(ref_data.to_dict("records")[0])
         mol = mol_from_smiles(rec.get("Smiles", "C"))
         rec["Sim_Format"] = "{:.1f}".format(rec["Similarity"] * 100)
         rec["mol_img"] = mol_img_tag(mol)
@@ -421,9 +425,10 @@ def parm_hist(increased, decreased):
     return result
 
 
-def detailed_report(rec, sim_refs, src_dir, ctrl_images):
+def detailed_report(rec, df_refs, sim_refs, src_dir, ctrl_images):
     date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
     image_dir = op.join(src_dir, "images")
+    container_id = rec["Container_Id"]
     act_prof = rec["Act_Profile"]
     inc_parm, changed = changed_parameters_table(act_prof, "2")
     increased = parm_stats(changed)
@@ -454,26 +459,33 @@ def detailed_report(rec, sim_refs, src_dir, ctrl_images):
         im = load_image(image_dir, well, ch)
         templ_dict["Img_{}_Cpd".format(ch)] = img_tag(im, options='style="width: 250px;"')
         templ_dict["Img_{}_Ctrl".format(ch)] = ctrl_images[ch]
-    if len(sim_refs) > 0:
-        ref_tbl = sim_ref_table(sim_refs)
-        templ_dict["Ref_Table"] = ref_tbl
+    if container_id in sim_refs:
+        similar = sim_refs[container_id]
+        if len(similar) > 0:
+            ref_tbl = sim_ref_table(df_refs, similar)
+            templ_dict["Ref_Table"] = ref_tbl
+        else:
+            templ_dict["Ref_Table"] = "No similar References found."
     else:
-        templ_dict["Ref_Table"] = "No similar References found."
+        # this should not happen:
+        templ_dict["Ref_Table"] = "### BUG! Please notify Axel."
+
     t = Template(cprt.DETAILS_TEMPL)
 
     report = t.substitute(templ_dict)
     return report
 
 
-def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cutoff=0.6,
-                act_cutoff=ACT_CUTOFF_PERC, highlight=False, mode="cpd"):
+def full_report(df, src_dir, df_refs=REFERENCES, sim_refs=SIM_REFS, report_name="report",
+                plate=None, cutoff=0.6, act_cutoff=ACT_CUTOFF_PERC, highlight=False, mode="cpd"):
     overview_fn = op.join(report_name, "index.html")
     date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
     cpt.create_dirs(op.join(report_name, "details"))
     if isinstance(df, cpp.DataSet):
         df = df.data
     df_refs = cpt.check_df(df_refs, REFERENCES)
-    detailed_cpds = {}
+    if isinstance(sim_refs, str):
+        sim_refs = cpp.load_obj(sim_refs)
     print("* creating overview...")
     header = "{}\n<h2>Cell Painting Overview Report</h2>\n".format(cprt.LOGO)
     title = "Overview"
@@ -485,9 +497,9 @@ def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cut
         highlight_legend = cprt.HIGHLIGHT_LEGEND
     else:
         highlight_legend = ""
-
-    overview = header + overview_report(df, df_refs, cutoff=cutoff, detailed_cpds=detailed_cpds,
-                                        highlight=highlight, mode=mode) + highlight_legend
+    overview, detailed_cpds = overview_report(
+        df, df_refs, sim_refs, cutoff=cutoff, highlight=highlight, mode=mode)
+    overview = header + overview + highlight_legend
     write_page(overview, title=title, fn=overview_fn, templ=cprt.OVERVIEW_HTML_INTRO)
     # print(detailed_cpds)
     print("* creating detailed reports...")
@@ -499,8 +511,8 @@ def full_report(df, src_dir, df_refs=None, report_name="report", plate=None, cut
         container_id = rec["Container_Id"]
         fn = op.join(report_name, "details", "{}.html".format(sanitize_filename(container_id)))
         title = "{} Details".format(container_id)
-        sim_refs = detailed_cpds[container_id]
-        details = detailed_report(rec, sim_refs, src_dir, ctrl_images)
+        # similar = detailed_cpds[container_id]
+        details = detailed_report(rec, df_refs, sim_refs, src_dir, ctrl_images)
         write_page(details, title=title, fn=fn)
 
     print("* done.")

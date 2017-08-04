@@ -12,6 +12,9 @@ nim_ext/pmgen/
 *.mrv
 *.mol
 *.pyc
+pmgennim_ext_wrap.nim.cfg
+pmgennim_ext_wrap.nim
+pmgennim_ext_capi.c
 .spyderproject
 branch_info.txt
 commit_msg.txt
