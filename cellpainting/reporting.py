@@ -303,7 +303,8 @@ def overview_report(df, df_refs=None, sim_refs=SIM_REFS, cutoff=LIMIT_SIMILARITY
             if c_id in sim_refs:
                 similar = sim_refs[c_id]
                 if len(similar) > 0:
-                    max_sim = similar["Similarity"][0] * 100  # first in the list has the highest similarity
+                    max_sim = round(
+                        similar["Similarity"][0] * 100, 1)  # first in the list has the highest similarity
                     rec["Max_Sim"] = max_sim
                     if max_sim >= LIMIT_SIMILARITY_H:
                         rec["Col_Sim"] = cprt.COL_GREEN
