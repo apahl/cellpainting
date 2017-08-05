@@ -422,13 +422,13 @@ class DataSet():
         return result
 
 
-    def update_similar_refs(self, df_refs=REFERENCES, mode="cpd"):
+    def update_similar_refs(self, df_refs=REFERENCES, sim_refs=None, mode="cpd", write=True):
         """Find similar compounds in references and update the export file.
         The export file of the dict object is in pkl format. In addition,
         a tsv file (or maybe JSON?) is written for use in PPilot.
         This method dpes not return anything, it just writes the result to fle."""
         self.print_log("update similar")
-        update_similar_refs(self.data, df_refs=df_refs, mode=mode)
+        update_similar_refs(self.data, df_refs=df_refs, sim_refs=sim_refs, mode=mode, write=write)
 
 
     def find_similar(self, act_profile, cutoff=0.9, max_num=5):
@@ -991,6 +991,24 @@ def write_obj(obj, fn):
         pickle.dump(obj, f)
 
 
+def write_sim_refs(sim_refs):
+    """Export of sim_refs as pkl and as tsv for PPilot"""
+    sim_fn_pkl = SIM_REFS
+    sim_fn_pp = op.splitext(SIM_REFS)[0] + ".tsv"
+    write_obj(sim_refs, sim_fn_pkl)  # pkl for internal use
+    d = {"Container_Id": [], "Highest_Sim": []}
+    for container_id in sim_refs:
+        similar = sim_refs[container_id]
+        if len(similar) > 0:
+            highest_sim = similar["Similarity"][0]
+        else:
+            highest_sim = 0
+        d["Container_Id"].append(container_id)
+        d["Highest_Sim"].append(highest_sim)
+    df = pd.DataFrame(d)
+    df.to_csv(sim_fn_pp, sep="\t")  # tsv for PPilot
+
+
 def load_obj(fn=SIM_REFS):
     with open(fn, "rb") as f:
         obj = pickle.load(f)
@@ -1009,6 +1027,8 @@ def update_similar_refs(df, df_refs=REFERENCES, sim_refs=None, mode="cpd", write
     sim_fn = SIM_REFS
     df_refs = cpt.check_df(df_refs, REFERENCES)  # the file with the annotated references
     if sim_refs is None:
+        write = True
+        print("* write set to True")
         try:
             sim_refs = load_obj(sim_fn)
         except FileNotFoundError:
@@ -1035,7 +1055,9 @@ def update_similar_refs(df, df_refs=REFERENCES, sim_refs=None, mode="cpd", write
     if write:
         # with write=False, the writing can be deferred to the end of the processing pipeline,
         # but has to be done manually, then.
-        write_obj(sim_refs, sim_fn)
+        write_sim_refs(sim_refs, sim_fn)
+    else:
+        print("* don't forget to manually write SIM_REFS at the end of pipeline!")
 
 
 def cpd_similarity(df1, cpd1, df2, cpd2):
