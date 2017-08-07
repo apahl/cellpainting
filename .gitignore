@@ -1,6 +1,7 @@
 doc/_build/
 .ipynb_checkpoints/
 .kdev4/
+cellpainting/resource_paths.py
 cellpainting/test.html
 cellpainting/test.js
 cellpainting/temp.py

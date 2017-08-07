@@ -42,27 +42,28 @@ from . import tools as cpt
 from .config import ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC, LIMIT_SIMILARITY_L
 
 try:
-    from misc_tools import apl_tools, comas_config
+    from misc_tools import apl_tools
     AP_TOOLS = True
     #: Library version
     VERSION = apl_tools.get_commit(__file__)
     # I use this to keep track of the library versions I use in my project notebooks
     print("{:45s} (commit: {})".format(__name__, VERSION))
-    COMAS = comas_config.COMAS
-    ANNOTATIONS = comas_config.ANNOTATIONS
-    REFERENCES = comas_config.REFERENCES
-    SIM_REFS = comas_config.SIM_REFS
-    LAYOUTS = comas_config.LAYOUTS
 
 except ImportError:
     AP_TOOLS = False
     print("{:45s} ({})".format(__name__, time.strftime("%y%m%d-%H:%M", time.localtime(op.getmtime(__file__)))))
-    COMAS = ""
-    ANNOTATIONS = ""
-    REFERENCES = ""
-    SIM_REFS = ""
-    LAYOUTS = ""
 
+try:
+    from . import resource_paths
+except ImportError:
+    print("""# Resource Paths not found. You need to create a file `resource_paths.py` in the project dir.
+      It has to contain the locations of
+        - smiles_path: gzipped tab-delim. file with structure Smiles and Compound_Id.
+        - annotations_path: tab-delim. file with annotations to the references.
+        - references_path: tab-delim. file to the references to compare against.
+        - sim_refs_path: pickle file containing the similar references to every compound.
+        - layouts_path: tab-delim. file containing all plate layouts.
+    """)
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
                     "Compound_Id", 'Container_Id', "Producer", "Pure_Flag", "Toxic", "Rel_Cell_Count",
@@ -234,14 +235,14 @@ class DataSet():
         return result
 
 
-    def join_layout_1536(self, layout, plate, quadrant, on="Address_384", how="inner"):
+    def join_layout_1536(self, plate, quadrant, on="Address_384", how="inner"):
         """Cell Painting is always run in 384er plates.
         COMAS standard screening plates are format 1536.
         With this function, the 1536-to-384 reformatting file
         with the smiles added by join_smiles_to_layout_1536()
         can be used directly to join the layout to the individual 384er plates."""
         result = DataSet(log=self.log)
-        result.data = join_layout_1536(self.data, layout, plate, quadrant, on=on, how=how)
+        result.data = join_layout_1536(self.data, plate, quadrant, on=on, how=how)
         result.print_log("join layout 1536")
         return result
 
@@ -422,13 +423,20 @@ class DataSet():
         return result
 
 
-    def update_similar_refs(self, df_refs=REFERENCES, sim_refs=None, mode="cpd", write=True):
+    def update_similar_refs(self, mode="cpd", write=True):
         """Find similar compounds in references and update the export file.
         The export file of the dict object is in pkl format. In addition,
         a tsv file (or maybe JSON?) is written for use in PPilot.
         This method dpes not return anything, it just writes the result to fle."""
-        self.print_log("update similar")
-        update_similar_refs(self.data, df_refs=df_refs, sim_refs=sim_refs, mode=mode, write=write)
+        rem = "" if write else "write is off"
+        update_similar_refs(self.data, mode=mode, write=write)
+        self.print_log("update similar", rem)
+
+
+    def update_datastore(self, mode="cpd", write=True):
+        """Update the DataStore with the current DataFrame."""
+        rem = "" if write else "write is off"
+        update_datastore(self.data, mode=mode, write=write)
 
 
     def find_similar(self, act_profile, cutoff=0.9, max_num=5):
@@ -494,7 +502,7 @@ def print_log(df, component, add_info=""):
     component = component + ":"
     if len(add_info) > 0:
         add_info = "    ({})".format(add_info)
-    print("{:22s} ({:4d} | {:4d}){}".format(component, df.shape[0], df.shape[1], add_info))
+    print("* {:22s} ({:5d} | {:4d}){}".format(component, df.shape[0], df.shape[1], add_info))
 
 
 def read_smiles_file(fn, props=['Compound_Id', "Smiles", "Pure_Flag"]):
@@ -504,6 +512,88 @@ def read_smiles_file(fn, props=['Compound_Id', "Smiles", "Pure_Flag"]):
     result = result[props]
     result = result.apply(pd.to_numeric, errors='ignore')
     return result
+
+
+def clear_resources():
+    try:
+        del SMILES
+        print("* deleted resource: SMILES")
+    except NameError:
+        pass
+    try:
+        del ANNOTATIONS
+        print("* deleted resource: ANNOTATIONS")
+    except NameError:
+        pass
+    try:
+        del REFERENCES
+        print("* deleted resource: REFERENCES")
+    except NameError:
+        pass
+    try:
+        del SIM_REFS
+        print("* deleted resource: SIM_REFS")
+    except NameError:
+        pass
+    try:
+        del DATASTORE
+        print("* deleted resource: DATASTORE")
+    except NameError:
+        pass
+    try:
+        del LAYOUTS
+        print("* deleted resource: LAYOUTS")
+    except NameError:
+        pass
+
+
+def load_resource(resource):
+    res = resource.lower()[:3]
+    glbls = globals()
+    if res == "smi":
+        if "SMILES" not in glbls:
+            # except NameError:
+            global SMILES
+            print("- loading resource:                        (SMILES)")
+            SMILES = read_smiles_file(resource_paths.smiles_path)
+            SMILES = SMILES[resource_paths.smiles_cols]
+            SMILES = SMILES.apply(pd.to_numeric, errors='ignore')
+    elif res == "ann":
+        if "ANNOTATIONS" not in glbls:
+            global ANNOTATIONS
+            print("- loading resource:                        (ANNOTATIONS)")
+            ANNOTATIONS = pd.read_csv(resource_paths.annotations_path, sep="\t")
+            ANNOTATIONS = ANNOTATIONS.apply(pd.to_numeric, errors='ignore')
+    elif res == "ref":
+        if "REFERENCES" not in glbls:
+            global REFERENCES
+            print("- loading resource:                        (REFERENCES)")
+            REFERENCES = pd.read_csv(resource_paths.references_path, sep="\t")
+    elif res == "sim":
+        if "SIM_REFS" not in glbls:
+            global SIM_REFS
+            print("- loading resource:                        (SIM_REFS)")
+            try:
+                SIM_REFS = load_obj(resource_paths.sim_refs_path)
+            except FileNotFoundError:
+                print("  * SIM_REFS not found, creating new one.")
+                SIM_REFS = {}
+    elif res == "dat":
+        if "DATASTORE" not in glbls:
+            global DATASTORE
+            print("- loading resource:                        (DATASTORE)")
+            try:
+                DATASTORE = pd.read_csv(resource_paths.datastore_path, sep="\t")
+            except FileNotFoundError:
+                print("  * DATASTORE not found, creating new one.")
+                DATASTORE = pd.DataFrame()
+    elif res == "lay":
+        if "LAYOUTS" not in glbls:
+            global LAYOUTS
+            print("- loading resource:                        (LAYOUTS)")
+            LAYOUTS = pd.read_csv(resource_paths.layouts_path, sep="\t")
+    else:
+        raise FileNotFoundError("# unknow resource: {}".format(resource))
 
 
 def well_type_from_position(df):
@@ -567,18 +657,18 @@ def get_cpd_from_container(df):
     return result
 
 
-def join_layout_1536(df, layout, plate, quadrant, on="Address_384", sep="\t", how="inner"):
+def join_layout_1536(df, plate, quadrant, on="Address_384", sep="\t", how="inner"):
     """Cell Painting is always run in 384er plates.
     COMAS standard screening plates are format 1536.
     With this function, the 1536-to-384 reformatting file
     with the smiles added by join_smiles_to_layout_1536()
     can be used directly to join the layout to the individual 384er plates."""
+    load_resource("LAYOUTS")
+    layout = LAYOUTS.copy()
     if not isinstance(quadrant, str):
         quadrant = str(quadrant)
     drop = ["Plate_name_384", "Plate_name_1536", "Address_1536", "Index", 1, 2]
     result = df.copy()
-    layout = cpt.check_df(layout, LAYOUTS)
-    layout = layout.copy()
     layout[on] = layout["Plate_name_384"] + layout[on]
     if "Container_ID_1536" in layout.keys():
         layout.rename(columns={"Container_ID_1536": "Container_Id"}, inplace=True)
@@ -594,23 +684,37 @@ def join_layout_1536(df, layout, plate, quadrant, on="Address_384", sep="\t", ho
     return result
 
 
-def merge_update(df1, df2, on="Container_Id"):
-    result = df1.append(df2, ignore_index=True)
-    result = result.drop_duplicates(subset=on, keep="last")
-    return result
+def write_datastore():
+    df = DATASTORE
+    df = df.sort_values("Container_Id")
+    df.to_csv(resource_paths.datastore_path, index=False, sep="\t")
+    print_log(df, "write datastore")
+
+
+def update_datastore(df2, on="Container_Id", mode="cpd", write=False):
+    keep = ["Compound_Id", "Container_Id", "Producer", "Conc_uM", "Activity", "Toxic", "Pure_Flag",
+            "Rel_Cell_Count", 'Act_Profile', "Metadata_Well", "Plate", 'Smiles']
+    load_resource("DATASTORE")
+    df1 = DATASTORE
+    df2 = df2.copy()
+    df2 = df2[keep]
+    if "ref" in mode:
+        df2["Is_Ref"] = True
+    else:
+        df2["Is_Ref"] = False
+    df2 = df2[keep]
+    df1 = df1.append(df2, ignore_index=True)
+    print_log(df, "update datastore")
+    df1 = df1.drop_duplicates(subset=on, keep="last")
+    if write:
+        write_datastore()
 
 
 def join_smiles(df, df_smiles=None):
     """Join Smiles from Compound_Id."""
-    keep = ['Compound_Id', "Producer", "Smiles", "Pure_Flag"]
-    # df["Compound_Id"] = df["Compound_Id"].astype(int)
     if df_smiles is None:
-        df_smiles = pd.read_csv(COMAS, sep="\t")
-        df_smiles = df_smiles[keep]
-    elif isinstance(df_smiles, str):
-        df_smiles = pd.read_csv(df_smiles, sep="\t")
-    df_smiles = df_smiles.apply(pd.to_numeric, errors='ignore')
-    # df_smiles["Compound_Id"] = df_smiles["Compound_Id"].astype("int")
+        load_resource("SMILES")
+        df_smiles = SMILES
     result = df.merge(df_smiles, on="Compound_Id", how="inner")
     result = result.apply(pd.to_numeric, errors='ignore')
     return result
@@ -618,8 +722,8 @@ def join_smiles(df, df_smiles=None):
 
 def join_annotations(df):
     """Join Annotations from Compound_Id."""
-    annotations = pd.read_csv(ANNOTATIONS, sep="\t")
-    annotations = annotations.apply(pd.to_numeric, errors='ignore')
+    load_resource("ANNOTATIONS")
+    annotations = ANNOTATIONS
     result = df.merge(annotations, on="Compound_Id", how="left")
     result = result.replace(np.nan, "", regex=True)
     return result
@@ -991,11 +1095,12 @@ def write_obj(obj, fn):
         pickle.dump(obj, f)
 
 
-def write_sim_refs(sim_refs):
+def write_sim_refs():
     """Export of sim_refs as pkl and as tsv for PPilot"""
-    sim_fn_pkl = SIM_REFS
-    sim_fn_pp = op.splitext(SIM_REFS)[0] + ".tsv"
-    write_obj(sim_refs, sim_fn_pkl)  # pkl for internal use
+    sim_fn_pkl = resource_paths.sim_refs_path
+    sim_fn_pp = op.splitext(resource_paths.sim_refs_path)[0] + ".tsv"
+    sim_refs = SIM_REFS
+    write_obj(sim_refs, sim_fn_pkl)  # pkl for internal use, the resource should be loaded at this point
     d = {"Container_Id": [], "Highest_Sim": []}
     for container_id in sim_refs:
         similar = sim_refs[container_id]
@@ -1007,33 +1112,28 @@ def write_sim_refs(sim_refs):
         d["Highest_Sim"].append(highest_sim)
     df = pd.DataFrame(d)
     df.to_csv(sim_fn_pp, sep="\t")  # tsv for PPilot
+    print("* {:22s} ({:5d} |  --  )".format("write sim_refs", len(sim_refs)))
 
 
-def load_obj(fn=SIM_REFS):
+def load_obj(fn):
     with open(fn, "rb") as f:
         obj = pickle.load(f)
     return obj
 
 
-def update_similar_refs(df, df_refs=REFERENCES, sim_refs=None, mode="cpd", write=True):
+def update_similar_refs(df, mode="cpd", write=True):
     """Find similar compounds in references and update the export file.
     The export file of the dict object is in pkl format. In addition,
     a tsv file (or maybe JSON?) is written for use in PPilot.
     `mode` can be "cpd" or "ref". if `sim_refs`is not None,
     it has to be a dict of the correct format.
     With `write=False`, the writing of the file can be deferred to the end of the processing pipeline,
-        # but has to be done manually, then, with `write_obj(sim_refs_dict, SIM_REFS)`."""
-    # TODO: can PPilot handle JSON format?
-    sim_fn = SIM_REFS
-    df_refs = cpt.check_df(df_refs, REFERENCES)  # the file with the annotated references
-    if sim_refs is None:
-        write = True
-        print("* write set to True")
-        try:
-            sim_refs = load_obj(sim_fn)
-        except FileNotFoundError:
-            print("* No similar refs file was found. Generating a new one.")
-            sim_refs = {}
+    but has to be done manually, then, with `write_sim_refs()`."""
+
+    load_resource("REFERENCES")
+    load_resource("SIM_REFS")
+    df_refs = REFERENCES
+    sim_refs = SIM_REFS
 
     for _, rec in df.iterrows():
         if rec["Activity"] < ACT_CUTOFF_PERC or rec["Toxic"]:
@@ -1055,9 +1155,7 @@ def update_similar_refs(df, df_refs=REFERENCES, sim_refs=None, mode="cpd", write
     if write:
         # with write=False, the writing can be deferred to the end of the processing pipeline,
         # but has to be done manually, then.
-        write_sim_refs(sim_refs, sim_fn)
-    else:
-        print("* don't forget to manually write SIM_REFS at the end of pipeline!")
+        write_sim_refs()
 
 
 def cpd_similarity(df1, cpd1, df2, cpd2):
