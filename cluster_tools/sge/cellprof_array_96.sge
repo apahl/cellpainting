@@ -1,0 +1,60 @@
+#!/bin/bash
+# usage: qsub cellprof_array_96.sge <folder>
+
+CPPIPE=170623_mpc
+FOLDER=${1%/}  # removes trailing slash, if there is one
+INPUT=/ptmp/allg/apahl/cp/queue/$FOLDER
+OUTPUT=/ptmp/allg/apahl/cp/output/${FOLDER}_output
+CELLPROF_DIR=/afs/ipp-garching.mpg.de/home/a/apahl/dev/github/CellProfiler
+ORIG_DIR=$(pwd)
+JOB_LOG=$ORIG_DIR/job_${JOB_ID}_${FOLDER}.log
+
+#$ -S /bin/bash
+#$ -cwd
+#$ -j y
+#$ -N cellprof96
+#$ -M axel.pahl@mpi-dortmund.mpg.de
+#$ -m n
+#$ -l h_rt=08:00:00
+#$ -l h_vmem=6g
+#$ -t 1-96
+
+if [[ $SGE_TASK_ID == 1 ]]; then
+  echo "`date +"%Y%m%d %H:%M"`  $JOB_ID: cellprof_array_96 $FOLDER (pipe: $CPPIPE) started..."
+  echo "`date +"%Y%m%d %H:%M"`  $JOB_ID: cellprof_array_96 $FOLDER (pipe: $CPPIPE) started..." >> $ORIG_DIR/job_info.log
+  mkdir -p $OUTPUT
+fi
+
+sleep 5
+source activate cellprof
+sleep 10
+cellprofiler -c -p /ptmp/allg/apahl/cp/configs/$CPPIPE.cppipe -r -i $INPUT -o $OUTPUT/$(((SGE_TASK_ID - 1) * 36 + 1)) -L 10 -f $(((SGE_TASK_ID - 1) * 36 + 1)) -l $((SGE_TASK_ID * 36)) -t /ptmp/allg/apahl/cp/tmp
+RETVAL=$?
+source deactivate
+
+if [[ $RETVAL == 0 ]]; then
+  RETSTAT="finished."
+else
+  RETSTAT="FAILED with error code $RETVAL."
+fi
+
+# add a line to the file which is used to keep track of the finished tasks:
+echo "`date +"%Y%m%d %H:%M"`  $JOB_ID  $SGE_TASK_ID  $RETSTAT" >> $JOB_LOG
+
+NUM_FINISHED=$(cat $JOB_LOG | wc -l)
+if [[ $NUM_FINISHED == 96 ]]; then
+  # copy the pipeline that was used into the output folder:
+  cp /ptmp/allg/apahl/cp/configs/$CPPIPE.cppipe $OUTPUT/
+  # put the plate name also in the folder:
+  echo $FOLDER > $OUTPUT/plate_info.txt
+  # mv the logfiles to the logs folder: cellprof96.o8882246.*
+  mv /ptmp/allg/apahl/cellprof96.o$JOB_ID.* /ptmp/allg/apahl/logs/
+
+  # note the CellProfiler commit that was used
+  cd $CELLPROF_DIR
+  echo "CellProfiler Version Commit:" > $OUTPUT/versions.txt
+  echo "$(git rev-parse --short HEAD)  ($(git show -s --format=%ci HEAD))" >> $OUTPUT/versions.txt
+  cd $ORIG_DIR
+
+  echo "`date +"%Y%m%d %H:%M"`  $JOB_ID: cellprof_array_96 $FOLDER finished." >> $ORIG_DIR/job_info.log
+fi

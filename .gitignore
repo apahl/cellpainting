@@ -8,6 +8,7 @@ cellpainting/temp.py
 cellpainting/nim_ext.so
 nim_ext/nim_ext.so
 nim_ext/pmgen/
+notebooks/.ipynb_checkpoints/
 *.pkl
 *.png
 *.mrv

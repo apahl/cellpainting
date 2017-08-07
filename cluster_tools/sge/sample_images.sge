@@ -1,0 +1,18 @@
+#!/bin/bash
+# usage: qsub sample_images.sge <plate>
+
+export PLATE=${1%/}
+
+#$ -S /bin/bash
+#$ -cwd
+#$ -j y
+#$ -N sample_img
+#$ -M axel.pahl@mpi-dortmund.mpg.de
+#$ -m e
+#$ -l h_rt=02:00:00
+#$ -l h_vmem=4g
+
+echo "`date +"%Y%m%d %H:%M"`  $JOB_ID: sample_images $PLATE started..."
+echo "`date +"%Y%m%d %H:%M"`  $JOB_ID: sample_images $PLATE started..." >> /ptmp/allg/apahl/job_info.log
+sample_images $PLATE
+echo "`date +"%Y%m%d %H:%M"`  $JOB_ID: sample_images $PLATE finished." >> /ptmp/allg/apahl/job_info.log

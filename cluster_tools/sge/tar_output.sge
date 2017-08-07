@@ -1,0 +1,19 @@
+#!/bin/bash
+# usage: qsub tar_output.sge <plate>
+
+export FOLDER=${1%/}_output
+
+#$ -S /bin/bash
+#$ -cwd
+#$ -j y
+#$ -N tar_output
+#$ -M axel.pahl@mpi-dortmund.mpg.de
+#$ -m e
+#$ -l h_rt=04:00:00
+#$ -l h_vmem=4g
+
+echo "`date +"%Y%m%d %H:%M"`  $JOB_ID: tar_output $FOLDER started..."
+echo "`date +"%Y%m%d %H:%M"`  $JOB_ID: tar_output $FOLDER started..." >> /ptmp/allg/apahl/job_info.log
+cd /ptmp/allg/apahl/cp/output
+tar cvzf $FOLDER.tgz $FOLDER/
+echo "`date +"%Y%m%d %H:%M"`  $JOB_ID: tar_output $FOLDER finished." >> /ptmp/allg/apahl/job_info.log

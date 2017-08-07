@@ -1,0 +1,35 @@
+#!/bin/bash
+# usage: qsub cellprof_slice.sh <image_folder> <first_image> <last_image>
+#    or: qsub cellprof_slice.sh <image_folder> <slice_no>
+
+CPPIPE=170623_mpc
+FOLDER=${1%/}
+START=$2
+END=$3
+INPUT=/ptmp/allg/apahl/cp/queue/$FOLDER
+OUTPUT=/ptmp/allg/apahl/cp/output/${FOLDER}_output
+
+if [ -z $END ]; then
+  SLICE_NO=$START
+  START=$(((SLICE_NO - 1) * 36 + 1))
+  END=$((SLICE_NO * 36))
+fi
+
+#$ -S /bin/bash
+#$ -cwd
+#$ -j y
+#$ -M axel.pahl@mpi-dortmund.mpg.de
+#$ -m n
+#$ -l h_rt=08:00:00
+#$ -l h_vmem=6g
+
+
+echo "`date +"%Y%m%d %H:%M"`  $JOB_ID: cellprof_slice    $FOLDER ($START - $END) started (pipe: $CPPIPE)..." >> job_info.log
+
+mkdir -p $OUTPUT
+source activate cellprof
+sleep 10
+cellprofiler -c -p /ptmp/allg/apahl/cp/configs/$CPPIPE.cppipe -r -i $INPUT -o $OUTPUT/$START -t /ptmp/allg/apahl/cp/tmp -L 10 -f $START -l $END
+source deactivate
+
+echo "`date +"%Y%m%d %H:%M"`  $JOB_ID: cellprof_slice    $FOLDER ($START - $END) finished." >> job_info.log
