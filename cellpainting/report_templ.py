@@ -667,8 +667,6 @@ OVERVIEW_HTML_INTRO = """
 <body>"""
 t = PreTemplate(OVERVIEW_HTML_INTRO)
 OVERVIEW_HTML_INTRO = t.substitute(CSS=CSS, JS=JS)
-write(JS, "test_js.txt")
-write(OVERVIEW_HTML_INTRO, "test_intro.txt")
 
 HTML_EXTRO = """
 </body>

@@ -435,7 +435,6 @@ class DataSet():
 
     def update_datastore(self, mode="cpd", write=True):
         """Update the DataStore with the current DataFrame."""
-        rem = "" if write else "write is off"
         update_datastore(self.data, mode=mode, write=write)
 
 
@@ -704,7 +703,8 @@ def update_datastore(df2, on="Container_Id", mode="cpd", write=False):
         df2["Is_Ref"] = False
     df2 = df2[keep]
     df1 = df1.append(df2, ignore_index=True)
-    print_log(df, "update datastore")
+    rem = "" if write else "write is off"
+    print_log(df2, "update datastore", rem)
     df1 = df1.drop_duplicates(subset=on, keep="last")
     if write:
         write_datastore()
