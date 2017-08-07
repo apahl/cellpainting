@@ -147,13 +147,16 @@ def b64_mol(mol, size=300):
 
 def b64_img(im, format="JPEG"):
     if isinstance(im, IO):
+        needs_close = False
         img_file = im
     else:
+        needs_close = True
         img_file = IO()
         im.save(img_file, format=format)
     b64 = base64.b64encode(img_file.getvalue())
     b64 = b64.decode()
-    img_file.close()
+    if needs_close:
+        img_file.close()
     return b64
 
 
@@ -413,8 +416,9 @@ def parm_hist(increased, decreased):
     plt.legend()
     plt.tight_layout()
     img_file = IO()
-    plt.savefig(img_file, bbox_inches='tight', format="png")
-    result = img_tag(img_file, format="png", options='style="width: 800px;"')
+    plt.savefig(img_file, bbox_inches='tight', format="jpg")
+    result = img_tag(img_file, format="jpg", options='style="width: 800px;"')
+    img_file.close()
     # important, otherwise the plots will accumulate and fill up memory:
     plt.close()
     return result
