@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 from . import tools as cpt
 from . import report_templ as cprt
 from . import processing as cpp
+from . import resource_paths as cprp
 from .config import (ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC,
                      LIMIT_ACTIVITY_H, LIMIT_ACTIVITY_L,
                      LIMIT_CELL_COUNT_H, LIMIT_CELL_COUNT_L,
@@ -424,6 +425,24 @@ def parm_hist(increased, decreased):
     return result
 
 
+def show_images(plate_quad, well):
+    """For interactive viewing in the notebook."""
+    date = cprp.DATES[plate_quad]
+    conf = cprp.CONFS[plate_quad]
+    src_dir = cprp.src_path.format(date, plate_quad, conf)
+    ctrl_images = load_control_images(src_dir)
+    image_dir = op.join(src_dir, "images")
+    templ_dict = {}
+    for ch in range(1, 6):
+        im = load_image(image_dir, well, ch)
+        templ_dict["Img_{}_Cpd".format(ch)] = img_tag(im, options='style="width: 250px;"')
+        templ_dict["Img_{}_Ctrl".format(ch)] = ctrl_images[ch]
+    tbody_templ = Template(cprt.IMAGES_TABLE)
+    table = cprt.TABLE_INTRO + tbody_templ.substitute(templ_dict) + cprt.HTML_EXTRO
+    return HTML(table)
+
+
+
 def detailed_report(rec, src_dir, ctrl_images):
     cpp.load_resource("SIM_REFS")
     sim_refs = cpp.SIM_REFS
@@ -511,7 +530,7 @@ def full_report(df, src_dir, report_name="report", plate=None,
         title = "{} Details".format(container_id)
         # similar = detailed_cpds[container_id]
         details = detailed_report(rec, src_dir, ctrl_images)
-        write_page(details, title=title, fn=fn)
+        write_page(details, title=title, fn=fn, templ=cprt.DETAILS_HTML_INTRO)
 
     print("* done.")
     return HTML('<a href="{}">{}</a>'.format(overview_fn, "Overview"))

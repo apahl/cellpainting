@@ -546,7 +546,7 @@ def clear_resources():
         pass
 
 
-def load_resource(resource):
+def load_resource(resource, mode="cpd"):
     res = resource.lower()[:3]
     glbls = globals()
     if res == "smi":
@@ -572,8 +572,12 @@ def load_resource(resource):
         if "SIM_REFS" not in glbls:
             global SIM_REFS
             print("- loading resource:                        (SIM_REFS)")
+            if "ldc" in mode.lower():
+                srp = resource_paths.sim_refs_ldc_path
+            else:
+                srp = resource_paths.sim_refs_ldc_path
             try:
-                SIM_REFS = load_obj(resource_paths.sim_refs_path)
+                SIM_REFS = load_obj(srp)
             except FileNotFoundError:
                 print("  * SIM_REFS not found, creating new one.")
                 SIM_REFS = {}
@@ -691,6 +695,7 @@ def write_datastore():
 
 
 def update_datastore(df2, on="Container_Id", mode="cpd", write=False):
+    global DATASTORE
     keep = ["Compound_Id", "Container_Id", "Producer", "Conc_uM", "Activity", "Toxic", "Pure_Flag",
             "Rel_Cell_Count", 'Act_Profile', "Metadata_Well", "Plate", 'Smiles']
     load_resource("DATASTORE")
@@ -705,7 +710,9 @@ def update_datastore(df2, on="Container_Id", mode="cpd", write=False):
     df1 = df1.append(df2, ignore_index=True)
     rem = "" if write else "write is off"
     print_log(df2, "update datastore", rem)
-    df1 = df1.drop_duplicates(subset=on, keep="last")
+    DATASTORE = df1.drop_duplicates(subset=on, keep="last")
+    print("df1:      ", df1.shape)
+    print("DATASTORE:", DATASTORE.shape)
     if write:
         write_datastore()
 
@@ -1095,10 +1102,13 @@ def write_obj(obj, fn):
         pickle.dump(obj, f)
 
 
-def write_sim_refs():
+def write_sim_refs(mode="cpd"):
     """Export of sim_refs as pkl and as tsv for PPilot"""
-    sim_fn_pkl = resource_paths.sim_refs_path
-    sim_fn_pp = op.splitext(resource_paths.sim_refs_path)[0] + ".tsv"
+    if "ldc" in mode.lower():
+        sim_fn_pkl = resource_paths.sim_refs_ldc_path
+    else:
+        sim_fn_pkl = resource_paths.sim_refs_path
+    sim_fn_pp = op.splitext(sim_fn_pkl)[0] + ".tsv"
     sim_refs = SIM_REFS
     write_obj(sim_refs, sim_fn_pkl)  # pkl for internal use, the resource should be loaded at this point
     d = {"Container_Id": [], "Highest_Sim": []}
@@ -1131,7 +1141,7 @@ def update_similar_refs(df, mode="cpd", write=True):
     but has to be done manually, then, with `write_sim_refs()`."""
 
     load_resource("REFERENCES")
-    load_resource("SIM_REFS")
+    load_resource("SIM_REFS", mode=mode)
     df_refs = REFERENCES
     sim_refs = SIM_REFS
 

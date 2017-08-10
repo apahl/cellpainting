@@ -668,6 +668,22 @@ OVERVIEW_HTML_INTRO = """
 t = PreTemplate(OVERVIEW_HTML_INTRO)
 OVERVIEW_HTML_INTRO = t.substitute(CSS=CSS, JS=JS)
 
+DETAILS_HTML_INTRO = """
+<!DOCTYPE html>
+<html>
+<head>
+  <title>$title</title>
+  <meta charset="UTF-8">
+  §CSS
+  <script type="text/javascript" src="http://oracle-server.mpi-dortmund.mpg.de:9944/reporting/javascript/reportCore96.17_2_0_1361.js"></script>
+  <script type="text/javascript">
+  PP_STARTUP_FUNCTION.addStartupFunction(Pilot.Report.Core.ProtocolLinks.initializeLinks);
+  </script>
+</head>
+<body>"""
+t = PreTemplate(DETAILS_HTML_INTRO)
+DETAILS_HTML_INTRO = t.substitute(CSS=CSS)
+
 HTML_EXTRO = """
 </body>
 </html>"""
@@ -771,7 +787,7 @@ REF_TABLE_HEADER = """
 REF_TABLE_ROW = """
 <tr>
     <td>$idx</td>
-    <td><a href="../../references/details/$link.html">$mol_img</a></td>
+    <td><a href="../../references/details/$link.html" ppLO="wpNT">$mol_img</a></td>
     <td>$Container_Id</td>
     <td>${Conc_uM}</td>
     <td>$Activity</td>
@@ -831,7 +847,7 @@ DETAILS_REF_ROW = """
 DETAILS_TEMPL = """
 §LOGO
 <h1>Detailed Report</h1>
-<a href="http://oracle-server.mpi-dortmund.mpg.de:9944/perlbin/runjob.pl?_protocol=%7B5E6F1B34-70E1-88E4-1C51-71D239DAE9E1%7D&Compound_ID=$Compound_Id&Supplier_ID=&Alternate_ID=&IC50_view=False&Compound_level=True&Batch_level=False&__QuickRun=true">$mol_img</a>
+<a href="http://oracle-server.mpi-dortmund.mpg.de:9944/perlbin/runjob.pl?_protocol=%7B5E6F1B34-70E1-88E4-1C51-71D239DAE9E1%7D&Compound_ID=$Compound_Id&Supplier_ID=&Alternate_ID=&IC50_view=False&Compound_level=True&Batch_level=False&__QuickRun=true" ppLO="wpNT">$mol_img</a>
 <h2>Compound Id $Compound_Id</h2>
 §TABLE_INTRO
 <tr>
