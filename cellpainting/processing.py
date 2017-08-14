@@ -56,9 +56,11 @@ except ImportError:
 try:
     from . import resource_paths
 except ImportError:
-    print("""# Resource Paths not found. You need to create a file `resource_paths.py` in the project dir.
+    print("""# Resource Paths not found. You need to create a file `resource_paths.py` in the project dir. Use the provided `resource_paths_templ.py` as a template for the file.
       It has to contain the locations of
         - smiles_path: gzipped tab-delim. file with structure Smiles and Compound_Id.
+        - data_path: gzipped tab-delim. file with data Container_Id and
+                     container based data like purity (Pure_Flag).
         - annotations_path: tab-delim. file with annotations to the references.
         - references_path: tab-delim. file to the references to compare against.
         - sim_refs_path: pickle file containing the similar references to every compound.
@@ -66,9 +68,9 @@ except ImportError:
     """)
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
-                    "Compound_Id", 'Container_Id', "Producer", "Pure_Flag", "Toxic", "Rel_Cell_Count",
-                    "Known_Act", "Trivial_Name", 'WellType', 'Conc_uM', "Activity", "Act_Profile",
-                    "Plate", "Smiles"]
+                    "Compound_Id", 'Container_Id', "Well_Id", "Producer", "Pure_Flag", "Toxic",
+                    "Rel_Cell_Count", "Known_Act", "Trivial_Name", 'WellType', 'Conc_uM',
+                    "Activity", "Act_Profile", "Plate", "Smiles"]
 DROP_FROM_NUMBERS = ['plateColumn', 'plateRow', 'Conc_uM', "Compound_Id"]
 DROP_GLOBAL = ["PathName_CellOutlines", "URL_CellOutlines", 'FileName_CellOutlines',
                'ImageNumber', 'Metadata_Site', 'Metadata_Site_1', 'Metadata_Site_2']
@@ -320,10 +322,26 @@ class DataSet():
         return result
 
 
-    def join_smiles(self, df_smiles=None):
+    def join_batch_data(self, df_data=None, how="left", fillna="n.d."):
+        """Join data by Batch_Id."""
+        result = DataSet()
+        result.data = join_batch_data(self.data, df_data=df_data, how=how, fillna=fillna)
+        result.print_log("join batch data")
+        return result
+
+
+    def join_container_data(self, df_data=None, how="left", fillna=""):
+        """Join data by Container_Id."""
+        result = DataSet()
+        result.data = join_container_data(self.data, df_data=df_data, how=how, fillna=fillna)
+        result.print_log("join cntnr data")
+        return result
+
+
+    def join_smiles(self, df_smiles=None, how="left"):
         """Join Smiles from Compound_Id."""
         result = DataSet()
-        result.data = join_smiles(self.data, df_smiles=df_smiles)
+        result.data = join_smiles(self.data, df_smiles=df_smiles, how=how)
         result.print_log("join smiles")
         return result
 
@@ -447,10 +465,10 @@ class DataSet():
         return result
 
 
-    def cpd_similarity(self, cpd1, cpd2):
+    def well_id_similarity(self, well_id1, well_id2):
         """Calculate the similarity of the activity profiles from two compounds
         (identified by `Compound_Id`). Returns value between 0 .. 1"""
-        return cpd_similarity(self.data, cpd1, self.data, cpd2)
+        return well_id_similarity(self.data, well_id1, self.data, well_id2)
 
 
     def count_active_parameters_occurrences(self, parameters=ACT_PROF_PARAMETERS):
@@ -504,7 +522,7 @@ def print_log(df, component, add_info=""):
     print("* {:22s} ({:5d} | {:4d}){}".format(component, df.shape[0], df.shape[1], add_info))
 
 
-def read_smiles_file(fn, props=['Compound_Id', "Smiles", "Pure_Flag"]):
+def read_smiles_file(fn, props=['Compound_Id', "Smiles"]):
     """Read in the file with the Compound_Ids and the Simles.
     Return a DataFrame for fast access."""
     result = pd.read_csv(fn, sep="\t")
@@ -547,41 +565,41 @@ def clear_resources():
 
 
 def load_resource(resource, mode="cpd"):
-    res = resource.lower()[:3]
+    res = resource.lower()
     glbls = globals()
-    if res == "smi":
+    if "smi" in res:
         if "SMILES" not in glbls:
             # except NameError:
             global SMILES
             print("- loading resource:                        (SMILES)")
-            SMILES = read_smiles_file(resource_paths.smiles_path)
-            SMILES = SMILES[resource_paths.smiles_cols]
+            SMILES = read_smiles_file(resource_paths.smiles_path,
+                                      props=resource_paths.smiles_cols)
             SMILES = SMILES.apply(pd.to_numeric, errors='ignore')
-    elif res == "ann":
+    elif "annot" in res:
         if "ANNOTATIONS" not in glbls:
             global ANNOTATIONS
             print("- loading resource:                        (ANNOTATIONS)")
             ANNOTATIONS = pd.read_csv(resource_paths.annotations_path, sep="\t")
             ANNOTATIONS = ANNOTATIONS.apply(pd.to_numeric, errors='ignore')
-    elif res == "ref":
-        if "REFERENCES" not in glbls:
-            global REFERENCES
-            print("- loading resource:                        (REFERENCES)")
-            REFERENCES = pd.read_csv(resource_paths.references_path, sep="\t")
-    elif res == "sim":
+    elif "sim" in res:
         if "SIM_REFS" not in glbls:
             global SIM_REFS
             print("- loading resource:                        (SIM_REFS)")
-            if "ldc" in mode.lower():
-                srp = resource_paths.sim_refs_ldc_path
+            if "ext" in mode.lower():
+                srp = resource_paths.sim_refs_ext_path
             else:
-                srp = resource_paths.sim_refs_ldc_path
+                srp = resource_paths.sim_refs_path
             try:
                 SIM_REFS = load_obj(srp)
             except FileNotFoundError:
                 print("  * SIM_REFS not found, creating new one.")
                 SIM_REFS = {}
-    elif res == "dat":
+    elif "ref" in res:
+        if "REFERENCES" not in glbls:
+            global REFERENCES
+            print("- loading resource:                        (REFERENCES)")
+            REFERENCES = pd.read_csv(resource_paths.references_path, sep="\t")  # .fillna("")
+    elif "data" in res:
         if "DATASTORE" not in glbls:
             global DATASTORE
             print("- loading resource:                        (DATASTORE)")
@@ -590,13 +608,29 @@ def load_resource(resource, mode="cpd"):
             except FileNotFoundError:
                 print("  * DATASTORE not found, creating new one.")
                 DATASTORE = pd.DataFrame()
-    elif res == "lay":
+    elif "cont" in res:
+        if "CONTAINER" not in glbls:
+            global CONTAINER
+            print("- loading resource:                        (CONTAINER)")
+            CONTAINER = pd.read_csv(resource_paths.container_data_path, sep="\t")
+            if len(resource_paths.container_data_cols) > 0:
+                CONTAINER = CONTAINER[resource_paths.container_data_cols]
+            CONTAINER = CONTAINER.apply(pd.to_numeric, errors='ignore')
+    elif "batch" in res:
+        if "BATCH" not in glbls:
+            global BATCH
+            print("- loading resource:                        (BATCH)")
+            BATCH = pd.read_csv(resource_paths.batch_data_path, sep="\t")
+            if len(resource_paths.batch_data_cols) > 0:
+                BATCH = BATCH[resource_paths.batch_data_cols]
+            BATCH = BATCH.apply(pd.to_numeric, errors='ignore')
+    elif "layout" in res:
         if "LAYOUTS" not in glbls:
             global LAYOUTS
             print("- loading resource:                        (LAYOUTS)")
             LAYOUTS = pd.read_csv(resource_paths.layouts_path, sep="\t")
     else:
-        raise FileNotFoundError("# unknow resource: {}".format(resource))
+        raise FileNotFoundError("# unknown resource: {}".format(resource))
 
 
 def well_type_from_position(df):
@@ -653,6 +687,12 @@ def join_layout_384(df, layout_fn, on="Address"):
     return result
 
 
+def get_batch_from_container(df):
+    result = df.copy()
+    result["Batch_Id"] = result["Container_Id"].str[:9]
+    return result
+
+
 def get_cpd_from_container(df):
     result = pd.concat([df, df["Container_Id"].str.split(":", expand=True)], axis=1)
     result.rename(columns={0: "Compound_Id"}, inplace=True)
@@ -682,26 +722,26 @@ def join_layout_1536(df, plate, quadrant, on="Address_384", sep="\t", how="inner
     result[on] = plate + "." + quadrant[-1:] + result["Metadata_Well"]
     result = result.merge(layout, on=on, how=how)
     result.drop(on, axis=1, inplace=True)
-    result["Container_Id"] = result["Container_Id"] + "_" + result["Metadata_Well"]
+    result["Well_Id"] = result["Container_Id"] + "_" + result["Metadata_Well"]
     result = result.apply(pd.to_numeric, errors='ignore')
     return result
 
 
 def write_datastore():
     df = DATASTORE
-    df = df.sort_values("Container_Id")
+    df = df.sort_values("Well_Id")
     df.to_csv(resource_paths.datastore_path, index=False, sep="\t")
     print_log(df, "write datastore")
 
 
-def update_datastore(df2, on="Container_Id", mode="cpd", write=False):
+def update_datastore(df2, on="Well_Id", mode="cpd", write=False):
     global DATASTORE
-    keep = ["Compound_Id", "Container_Id", "Producer", "Conc_uM", "Activity", "Toxic", "Pure_Flag",
-            "Rel_Cell_Count", 'Act_Profile', "Metadata_Well", "Plate", 'Smiles']
+    keep = ["Compound_Id", "Container_Id", "Well_Id", "Producer", "Conc_uM", "Is_Ref",
+            "Activity", "Toxic", "Pure_Flag", "Rel_Cell_Count", "Metadata_Well", "Plate",
+            'Smiles', 'Act_Profile']
     load_resource("DATASTORE")
     df1 = DATASTORE
     df2 = df2.copy()
-    df2 = df2[keep]
     if "ref" in mode:
         df2["Is_Ref"] = True
     else:
@@ -717,13 +757,38 @@ def update_datastore(df2, on="Container_Id", mode="cpd", write=False):
         write_datastore()
 
 
-def join_smiles(df, df_smiles=None):
+def join_batch_data(df, df_data=None, how="Left", fillna="n.d."):
+    """Join data from Batch_Id."""
+    if df_data is None:
+        load_resource("BATCH")
+        df_data = BATCH
+    if "Batch_Id" not in df.keys():
+        df = get_batch_from_container(df)
+    result = df.merge(df_data, on="Batch_Id", how=how)
+    result = result.apply(pd.to_numeric, errors='ignore')
+    result = result.fillna(fillna)
+    return result
+
+
+def join_container_data(df, df_data=None, how="Left", fillna=""):
+    """Join data from Container_Id."""
+    if df_data is None:
+        load_resource("CONTAINER")
+        df_data = CONTAINER
+    result = df.merge(df_data, on="Container_Id", how=how)
+    result = result.apply(pd.to_numeric, errors='ignore')
+    result = result.fillna(fillna)
+    return result
+
+
+def join_smiles(df, df_smiles=None, how="left"):
     """Join Smiles from Compound_Id."""
     if df_smiles is None:
         load_resource("SMILES")
         df_smiles = SMILES
-    result = df.merge(df_smiles, on="Compound_Id", how="inner")
+    result = df.merge(df_smiles, on="Compound_Id", how=how)
     result = result.apply(pd.to_numeric, errors='ignore')
+    result = result.fillna("*")
     return result
 
 
@@ -731,8 +796,9 @@ def join_annotations(df):
     """Join Annotations from Compound_Id."""
     load_resource("ANNOTATIONS")
     annotations = ANNOTATIONS
+    drop_cols(df, ["Trivial_Name", "Known_Act"], inplace=True)
     result = df.merge(annotations, on="Compound_Id", how="left")
-    result = result.replace(np.nan, "", regex=True)
+    result = result.fillna("")
     return result
 
 
@@ -802,7 +868,11 @@ def remove_impure(df, strict=False, reset_index=True):
     If `strict == True` compound with `Pure_Flag == Warn` are also removed."""
     result = df.copy()
     outliers_list = []
-    outl = result[result["Pure_Flag"] == "Fail"]
+    try:
+        outl = result[result["Pure_Flag"] == "Fail"]
+    except TypeError:
+        print(result["Pure_Flag"].dtype)
+        raise
     result = result[result["Pure_Flag"] != "Fail"]
     outliers_list.append(outl)
     if strict:
@@ -1104,21 +1174,21 @@ def write_obj(obj, fn):
 
 def write_sim_refs(mode="cpd"):
     """Export of sim_refs as pkl and as tsv for PPilot"""
-    if "ldc" in mode.lower():
-        sim_fn_pkl = resource_paths.sim_refs_ldc_path
+    if "ext" in mode.lower():
+        sim_fn_pkl = resource_paths.sim_refs_ext_path
     else:
         sim_fn_pkl = resource_paths.sim_refs_path
     sim_fn_pp = op.splitext(sim_fn_pkl)[0] + ".tsv"
     sim_refs = SIM_REFS
     write_obj(sim_refs, sim_fn_pkl)  # pkl for internal use, the resource should be loaded at this point
-    d = {"Container_Id": [], "Highest_Sim": []}
+    d = {"Well_Id": [], "Highest_Sim": []}
     for container_id in sim_refs:
         similar = sim_refs[container_id]
         if len(similar) > 0:
             highest_sim = similar["Similarity"][0]
         else:
             highest_sim = 0
-        d["Container_Id"].append(container_id)
+        d["Well_Id"].append(container_id)
         d["Highest_Sim"].append(highest_sim)
     df = pd.DataFrame(d)
     df.to_csv(sim_fn_pp, sep="\t")  # tsv for PPilot
@@ -1154,25 +1224,25 @@ def update_similar_refs(df, mode="cpd", write=True):
         if "ref" in mode:
             max_num += 1
         similar = find_similar(df_refs, act_profile, cutoff=LIMIT_SIMILARITY_L / 100, max_num=max_num)
-        similar = similar[["Container_Id", "Similarity"]]
+        similar = similar[["Well_Id", "Similarity"]]
         if "ref" in mode:
             similar.drop(similar.head(1).index, inplace=True)
         if similar.shape[0] == 0:
             ref_dict = {}
         else:
             ref_dict = similar.to_dict("list")
-        sim_refs[rec["Container_Id"]] = ref_dict
+        sim_refs[rec["Well_Id"]] = ref_dict
     if write:
         # with write=False, the writing can be deferred to the end of the processing pipeline,
         # but has to be done manually, then.
         write_sim_refs()
 
 
-def cpd_similarity(df1, cpd1, df2, cpd2):
+def well_id_similarity(df1, well_id1, df2, well_id2):
     """Calculate the similarity of the activity profiles from two compounds
-    (identified by `Compound_Id`). Returns value between 0 .. 1"""
-    act1 = df1[df1["Compound_Id"] == cpd1]["Act_Profile"].values[0]
-    act2 = df2[df2["Compound_Id"] == cpd2]["Act_Profile"].values[0]
+    (identified by `Well_Id`). Returns value between 0 .. 1"""
+    act1 = df1[df1["Well_Id"] == well_id1]["Act_Profile"].values[0]
+    act2 = df2[df2["Well_Id"] == well_id2]["Act_Profile"].values[0]
     return round(cpt.profile_sim(act1, act2), 3)
 
 

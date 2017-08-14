@@ -76,7 +76,7 @@ def check_2d_coords(mol, force=False):
 def mol_from_smiles(smi, calc_2d=True):
     mol = Chem.MolFromSmiles(smi)
     if not mol:
-        mol = Chem.MolFromSmiles("C")
+        mol = Chem.MolFromSmiles("*")
     else:
         if calc_2d:
             check_2d_coords(mol)
@@ -252,16 +252,13 @@ def remove_colors(rec):
 
 def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
                     highlight=False, mode="cpd"):
-    """detailed_cpds = {Compound_Id: [{"Compound_Id": Sim_Ref_Id with highest Similarity, "Trivial_Name": ...,
-    "Similarity": ..., "Known_Act": ..., "Smiles": ...},
-    {{"Compound_Id": Sim_Ref_Id with next highest Similarity, "Tr...}]}"""
     cpp.load_resource("SIM_REFS")
     sim_refs = cpp.SIM_REFS
     detailed_cpds = []
     if isinstance(df, cpp.DataSet):
         df = df.data
     if "ref" in mode:
-        act_cutoff = 2.5
+        act_cutoff = 5.0
     else:
         act_cutoff = ACT_CUTOFF_PERC
     report = [cprt.OVERVIEW_TABLE_INTRO, cprt.OVERVIEW_TABLE_HEADER]
@@ -269,7 +266,7 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
     idx = 0
     for _, rec in df.iterrows():
         idx += 1
-        mol = mol_from_smiles(rec.get("Smiles", "C"))
+        mol = mol_from_smiles(rec.get("Smiles", "*"))
         rec["mol_img"] = mol_img_tag(mol)
         rec["idx"] = idx
         if "Pure_Flag" not in rec:
@@ -293,10 +290,10 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
         convert_bool(rec, "Toxic")
 
         if has_details:
-            c_id = rec["Container_Id"]
-            detailed_cpds.append(c_id)
-            if c_id in sim_refs:
-                similar = sim_refs[c_id]
+            well_id = rec["Well_Id"]
+            detailed_cpds.append(well_id)
+            if well_id in sim_refs:
+                similar = sim_refs[well_id]
                 if len(similar) > 0:
                     max_sim = round(
                         similar["Similarity"][0] * 100, 1)  # first in the list has the highest similarity
@@ -315,7 +312,7 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
                 rec["Max_Sim"] = ""
                 rec["Col_Sim"] = cprt.COL_WHITE
 
-            details_fn = sanitize_filename(c_id)
+            details_fn = sanitize_filename(well_id)
             rec["Link"] = '<a href="details/{}.html">Detailed<br>Report</a>'.format(details_fn)
         if not highlight:
             # remove all coloring again:
@@ -326,25 +323,25 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
 
 
 def sim_ref_table(similar):
-    cpp.load_resource("REFERNCES")
+    cpp.load_resource("REFERENCES")
     df_refs = cpp.REFERENCES
     table = [cprt.TABLE_INTRO, cprt.REF_TABLE_HEADER]
     templ = Template(cprt.REF_TABLE_ROW)
-    for idx in range(len(similar["Container_Id"])):
+    for idx in range(len(similar["Well_Id"])):
         rec = {}
-        container_id = similar["Container_Id"][idx]
-        rec["Container_Id"] = container_id
+        well_id = similar["Well_Id"][idx]
+        rec["Well_Id"] = well_id
         rec["Similarity"] = similar["Similarity"][idx]
-        ref_data = df_refs[df_refs["Container_Id"] == container_id]
+        ref_data = df_refs[df_refs["Well_Id"] == well_id]
         ref_data = ref_data.copy()
         ref_data = ref_data.fillna("&mdash;")
         rec.update(ref_data.to_dict("records")[0])
-        mol = mol_from_smiles(rec.get("Smiles", "C"))
+        mol = mol_from_smiles(rec.get("Smiles", "*"))
         rec["Sim_Format"] = "{:.1f}".format(rec["Similarity"] * 100)
         rec["mol_img"] = mol_img_tag(mol)
         rec["idx"] = idx
 
-        link = sanitize_filename(rec["Container_Id"])
+        link = sanitize_filename(rec["Well_Id"])
         rec["link"] = link
         row = templ.substitute(rec)
         table.append(row)
@@ -442,19 +439,18 @@ def show_images(plate_quad, well):
     return HTML(table)
 
 
-
 def detailed_report(rec, src_dir, ctrl_images):
     cpp.load_resource("SIM_REFS")
     sim_refs = cpp.SIM_REFS
     date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
     image_dir = op.join(src_dir, "images")
-    container_id = rec["Container_Id"]
+    well_id = rec["Well_Id"]
     act_prof = rec["Act_Profile"]
     inc_parm, changed = changed_parameters_table(act_prof, "2")
     increased = parm_stats(changed)
     dec_parm, changed = changed_parameters_table(act_prof, "0")
     decreased = parm_stats(changed)
-    mol = mol_from_smiles(rec.get("Smiles", "C"))
+    mol = mol_from_smiles(rec.get("Smiles", "*"))
     if "Pure_Flag" not in rec:
         rec["Pure_Flag"] = "n.d."
 
@@ -465,9 +461,9 @@ def detailed_report(rec, src_dir, ctrl_images):
     templ_dict["Dec_Parm_Table"] = dec_parm
     templ_dict["parm_hist"] = parm_hist(increased, decreased)
     if "Known_Act" in templ_dict:
-        if templ_dict["Trivial_Name"] == "":
+        if templ_dict["Trivial_Name"] == np.nan or templ_dict["Trivial_Name"] == "":
             templ_dict["Trivial_Name"] = "&mdash;"
-        if templ_dict["Known_Act"] == "":
+        if templ_dict["Trivial_Name"] == np.nan or templ_dict["Known_Act"] == "":
             templ_dict["Known_Act"] = "&mdash;"
         t = Template(cprt.DETAILS_REF_ROW)
         templ_dict["Reference"] = t.substitute(templ_dict)
@@ -479,16 +475,19 @@ def detailed_report(rec, src_dir, ctrl_images):
         im = load_image(image_dir, well, ch)
         templ_dict["Img_{}_Cpd".format(ch)] = img_tag(im, options='style="width: 250px;"')
         templ_dict["Img_{}_Ctrl".format(ch)] = ctrl_images[ch]
-    if container_id in sim_refs:
-        similar = sim_refs[container_id]
+    if well_id in sim_refs:
+        similar = sim_refs[well_id]
         if len(similar) > 0:
             ref_tbl = sim_ref_table(similar)
             templ_dict["Ref_Table"] = ref_tbl
         else:
-            templ_dict["Ref_Table"] = "No similar References found."
+            templ_dict["Ref_Table"] = "No similar references found."
     else:
-        # this should not happen:
-        templ_dict["Ref_Table"] = "### BUG! Please notify Axel."
+        if rec["Activity"] < ACT_CUTOFF_PERC:
+            templ_dict["Ref_Table"] = "Because of low activity, no similarity was determined."
+        else:
+            # this should not happen:
+            templ_dict["Ref_Table"] = "### BUG! Please notify Axel."
 
     t = Template(cprt.DETAILS_TEMPL)
 
@@ -523,12 +522,12 @@ def full_report(df, src_dir, report_name="report", plate=None,
     print("  * loading control images...")
     ctrl_images = load_control_images(src_dir)
     print("  * writing individual reports...")
-    df_detailed = df[df["Container_Id"].isin(detailed_cpds)]
+    df_detailed = df[df["Well_Id"].isin(detailed_cpds)]
     for _, rec in df_detailed.iterrows():
-        container_id = rec["Container_Id"]
-        fn = op.join(report_name, "details", "{}.html".format(sanitize_filename(container_id)))
-        title = "{} Details".format(container_id)
-        # similar = detailed_cpds[container_id]
+        well_id = rec["Well_Id"]
+        fn = op.join(report_name, "details", "{}.html".format(sanitize_filename(well_id)))
+        title = "{} Details".format(well_id)
+        # similar = detailed_cpds[well_id]
         details = detailed_report(rec, src_dir, ctrl_images)
         write_page(details, title=title, fn=fn, templ=cprt.DETAILS_HTML_INTRO)
 
