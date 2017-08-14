@@ -354,6 +354,14 @@ class DataSet():
         return result
 
 
+    def add_dmso(self):
+        """Add DMSO to references."""
+        result = DataSet()
+        result.data = add_dmso(self.data)
+        result.print_log("add DMSO")
+        return result
+
+
     def poc(self, group_by=None, well_type="WellType", control_name="Control"):
         """Normalize the data set to Percent-Of-Control per group (e.g. per plate)
         based on the median of the controls.
@@ -802,6 +810,24 @@ def join_annotations(df):
     return result
 
 
+def add_dmso(df):
+    if df[df["Compound_Id"] == 245754].shape[0] > 0:
+        # DMSO already present
+        result = df.copy()
+    else:
+        d = {
+            "Compound_Id": [245754], "Container_Id": ["245754:01:01"], "Well_Id": ["245754:01:01_H11"],
+            "Producer": ["DMSO"], "Conc_uM": [10], "Activity": [0.0], "Rel_Cell_Count": [100],
+            "Pure_Flag": ["Ok"], "Toxic": [False], "Trivial_Name": ["DMSO"], "Known_Act": ["Control"],
+            "Metadata_Well": ["H11"], "Plate": ["170523-S0195-1"], "Smiles": ["CS(C)=O"],
+            "Act_Profile": [len(ACT_PROF_PARAMETERS) * "1"]
+        }
+        dmso = pd.DataFrame(d)
+        result = pd.concat([df, dmso])
+    return result
+
+
+
 def metadata(df):
     """Returns a list of the those parameters in the DataFrame that are NOT CellProfiler measurements."""
     parameters = [k for k in df.keys()
@@ -1154,7 +1180,7 @@ def correlation_filter(df, cutoff=0.9, method="pearson"):
 
 def find_similar(df, act_profile, cutoff=0.6, max_num=3):
     """Filter the dataframe for activity profiles similar to the given one.
-    `cutoff` gives the similarity threshold, default is 0.9."""
+    `cutoff` gives the similarity threshold, default is 0.6."""
     decimals = {"Similarity": 3}
     result = df.copy()
     result["Similarity"] = result["Act_Profile"].apply(lambda x: cpt.profile_sim(x,

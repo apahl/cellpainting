@@ -339,7 +339,7 @@ def sim_ref_table(similar):
         mol = mol_from_smiles(rec.get("Smiles", "*"))
         rec["Sim_Format"] = "{:.1f}".format(rec["Similarity"] * 100)
         rec["mol_img"] = mol_img_tag(mol)
-        rec["idx"] = idx
+        rec["idx"] = idx + 1
 
         link = sanitize_filename(rec["Well_Id"])
         rec["link"] = link
