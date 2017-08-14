@@ -36,10 +36,15 @@ except ImportError:
         ref_len = len(reference)
         assert ref_len == len(current), "Activity Profiles must have the same length to be compared."
         matching_bytes = 0
+        sig_pos = 0
         for idx in range(ref_len):
             if current[idx] == reference[idx]:
-                matching_bytes += 1
-        return matching_bytes / ref_len
+                if current[idx] != "1":
+                    matching_bytes += 1
+                    sig_pos += 1
+            else:
+                sig_pos += 1
+        return matching_bytes / sig_pos
 
 
 def format_well(well):

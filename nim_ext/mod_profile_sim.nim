@@ -10,10 +10,16 @@ proc profile_sim*(current, reference: string): float {.exportpy.} =
   Returns value between 0 .. 1"""
   let ref_len = len(reference)
   doAssert(ref_len == len(current), "Activity Profiles must have the same length to be compared.")
-  var matching_bytes = 0
+  var
+    matching_bytes = 0
+    sig_pos = 0
   for idx in 0 .. ref_len-1:
     if current[idx] == reference[idx]:
-      matching_bytes += 1
-  result = matching_bytes / ref_len
+      if current[idx] != '1':
+        matching_bytes += 1
+        sig_pos += 1
+    else:
+      sig_pos += 1
+  result = matching_bytes / sig_pos
 
 initPyModule("nim_ext", profile_sim)

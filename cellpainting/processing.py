@@ -464,9 +464,9 @@ class DataSet():
         update_datastore(self.data, mode=mode, write=write)
 
 
-    def find_similar(self, act_profile, cutoff=0.9, max_num=5):
+    def find_similar(self, act_profile, cutoff=0.5, max_num=5):
         """Filter the dataframe for activity profiles similar to the given one.
-        `cutoff` gives the similarity threshold, default is 0.9."""
+        `cutoff` gives the similarity threshold, default is 0.5."""
         result = DataSet()
         result.data = find_similar(self.data, act_profile=act_profile, cutoff=cutoff, max_num=max_num)
         result.print_log("find similar")
@@ -1178,7 +1178,7 @@ def correlation_filter(df, cutoff=0.9, method="pearson"):
     return df[parameters_uncorr], iteration
 
 
-def find_similar(df, act_profile, cutoff=0.6, max_num=3):
+def find_similar(df, act_profile, cutoff=0.5, max_num=3):
     """Filter the dataframe for activity profiles similar to the given one.
     `cutoff` gives the similarity threshold, default is 0.6."""
     decimals = {"Similarity": 3}
