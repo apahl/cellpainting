@@ -425,8 +425,7 @@ def parm_hist(increased, decreased):
 def show_images(plate_quad, well):
     """For interactive viewing in the notebook."""
     date = cprp.DATES[plate_quad]
-    conf = cprp.CONFS[plate_quad]
-    src_dir = cprp.src_path.format(date, plate_quad, conf)
+    src_dir = cprp.src_path.format(date, plate_quad)
     ctrl_images = load_control_images(src_dir)
     image_dir = op.join(src_dir, "images")
     templ_dict = {}

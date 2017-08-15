@@ -736,7 +736,7 @@ def join_layout_1536(df, plate, quadrant, on="Address_384", sep="\t", how="inner
 
 
 def write_datastore():
-    df = DATASTORE
+    df = DATASTORE[resource_paths.datastore_cols]
     df = df.sort_values("Well_Id")
     df.to_csv(resource_paths.datastore_path, index=False, sep="\t")
     print_log(df, "write datastore")
@@ -744,9 +744,6 @@ def write_datastore():
 
 def update_datastore(df2, on="Well_Id", mode="cpd", write=False):
     global DATASTORE
-    keep = ["Compound_Id", "Container_Id", "Well_Id", "Producer", "Conc_uM", "Is_Ref",
-            "Activity", "Toxic", "Pure_Flag", "Rel_Cell_Count", "Metadata_Well", "Plate",
-            'Smiles', 'Act_Profile']
     load_resource("DATASTORE")
     df1 = DATASTORE
     df2 = df2.copy()
@@ -754,7 +751,7 @@ def update_datastore(df2, on="Well_Id", mode="cpd", write=False):
         df2["Is_Ref"] = True
     else:
         df2["Is_Ref"] = False
-    df2 = df2[keep]
+    df2 = df2[resource_paths.datastore_cols]
     df1 = df1.append(df2, ignore_index=True)
     rem = "" if write else "write is off"
     print_log(df2, "update datastore", rem)
