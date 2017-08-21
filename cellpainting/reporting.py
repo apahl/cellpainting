@@ -313,7 +313,11 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
                 rec["Col_Sim"] = cprt.COL_WHITE
 
             details_fn = sanitize_filename(well_id)
-            rec["Link"] = '<a href="details/{}.html">Detailed<br>Report</a>'.format(details_fn)
+            if rec.get("Is_Ref", False):
+                plate = "references"
+            else:
+                plate = rec["Plate"]
+            rec["Link"] = '<a href="../{}/details/{}.html">Detailed<br>Report</a>'.format(plate, details_fn)
         if not highlight:
             # remove all coloring again:
             remove_colors(rec)
