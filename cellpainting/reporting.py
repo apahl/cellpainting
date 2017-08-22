@@ -393,6 +393,7 @@ def parm_hist(increased, decreased):
 
     n_groups = 5
     dpi = 96
+    # plt.rcParams['axes.titlesize'] = 25
     plt.style.use("seaborn-white")
     plt.style.use("seaborn-pastel")
     plt.style.use("seaborn-talk")
