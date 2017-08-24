@@ -420,7 +420,7 @@ class DataSet():
         return result
 
 
-    def correlation_filter_var(self, cutoff=0.9, method="pearson"):
+    def correlation_filter_std(self, cutoff=0.9, method="pearson"):
         """Reduce the parameter set to only uncorrelated parameters. From a set of correlated
         parameters only the one with the lowest variance in the controls is kept,
         all others are discarded.
