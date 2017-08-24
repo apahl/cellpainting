@@ -136,3 +136,14 @@ def parameters_from_act_profile_by_val(act_prof, val, parameters=ACT_PROF_PARAME
         if act == val:
             result.append(parameters[idx])
     return result
+
+
+def middle(lst, size):
+    """Return the middle fraction of a sorted list, removing outliers."""
+    mid_lst = sorted(list(lst))
+    l_mid_lst = len(mid_lst)
+    num_el = int(size * l_mid_lst)
+    start = (l_mid_lst - num_el) // 2
+    end = start + num_el
+    mid_lst = mid_lst[start:end]
+    return mid_lst

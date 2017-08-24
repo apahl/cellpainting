@@ -39,7 +39,8 @@ import numpy as np
 from IPython.core.display import HTML
 
 from . import tools as cpt
-from .config import ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC, LIMIT_SIMILARITY_L
+from .config import ACT_PROF_PARAMETERS
+from .config import ACT_CUTOFF_PERC, LIMIT_SIMILARITY_L
 
 try:
     from misc_tools import apl_tools
@@ -379,9 +380,11 @@ class DataSet():
         The byte is set when the parameter's value is greater (or smaller)
         than parameter_ctrl.median() + (or -) `mad_mult`* parameter.mad()
 
-        If a list of parameters is given, then the activity profile will be calculated for these parameters.
+        If a list of parameters is given, then the activity profile will be calculated
+        for these parameters.
 
-        If `only_final` == `True`, then only the parameters listed in `FINAL_PARAMETERS` are kept in the output_table.
+        If `only_final` == `True`, then only the parameters listed in `FINAL_PARAMETERS`
+        are kept in the output_table.
 
         Returns a new Pandas DataFrame."""
         result = DataSet()
@@ -391,15 +394,13 @@ class DataSet():
         return result
 
 
-    def relevant_parameters(self, ctrls_mad_rel_min=0.01,
-                            ctrls_mad_rel_max=0.10, use_cpds=True, times_mad=3.5):
+    def relevant_parameters(self, ctrls_std_rel_min=0.001,
+                            ctrls_std_rel_max=0.10):
         result = DataSet()
-        result.data = relevant_parameters(self.data, ctrls_mad_rel_min=ctrls_mad_rel_min,
-                                          ctrls_mad_rel_max=ctrls_mad_rel_max,
-                                          use_cpds=use_cpds, times_mad=times_mad)
-        result.print_log("relevant parameters", "{:.3f}/{:.3f}/{:.2f}".format(ctrls_mad_rel_min,
-                                                                              ctrls_mad_rel_max,
-                                                                              times_mad))
+        result.data = relevant_parameters(self.data, ctrls_std_rel_min=ctrls_std_rel_min,
+                                          ctrls_std_rel_max=ctrls_std_rel_max)
+        result.print_log("relevant parameters", "{:.3f}/{:.3f}".format(ctrls_std_rel_min,
+                                                                       ctrls_std_rel_max))
         return result
 
 
@@ -415,6 +416,18 @@ class DataSet():
         Returns a new DataFrame with only the non-correlated columns"""
         result = DataSet()
         result.data, iterations = correlation_filter_poc(self.data, cutoff=cutoff, method=method)
+        result.print_log("correlation filter", "{:3d} iterations".format(iterations))
+        return result
+
+
+    def correlation_filter_var(self, cutoff=0.9, method="pearson"):
+        """Reduce the parameter set to only uncorrelated parameters. From a set of correlated
+        parameters only the one with the lowest variance in the controls is kept,
+        all others are discarded.
+
+        Returns a new DataFrame with only the non-correlated columns"""
+        result = DataSet()
+        result.data, iterations = correlation_filter_std(self.data, cutoff=cutoff, method=method)
         result.print_log("correlation filter", "{:3d} iterations".format(iterations))
         return result
 
@@ -479,9 +492,11 @@ class DataSet():
         return well_id_similarity(self.data, well_id1, self.data, well_id2)
 
 
-    def count_active_parameters_occurrences(self, parameters=ACT_PROF_PARAMETERS):
+    def count_active_parameters_occurrences(self, act_prof="Act_Profile",
+                                            parameters=ACT_PROF_PARAMETERS):
         """Counts the number of times each parameter has been active in the dataset."""
-        return count_active_parameters_occurrences(self.data, parameters=ACT_PROF_PARAMETERS)
+        return count_active_parameters_occurrences(self.data, act_prof=act_prof,
+                                                   parameters=ACT_PROF_PARAMETERS)
 
 
     @property
@@ -828,14 +843,14 @@ def add_dmso(df):
 def metadata(df):
     """Returns a list of the those parameters in the DataFrame that are NOT CellProfiler measurements."""
     parameters = [k for k in df.keys()
-                  if not (k.startswith("Count_") or k.startswith("Mean_"))]
+                  if not (k.startswith("Count_") or k.startswith("Median_"))]
     return parameters
 
 
 def measurements(df):
     """Returns a list of the CellProfiler parameters that are in the DataFrame."""
     parameters = [k for k in df.select_dtypes(include=[np.number]).keys()
-                  if k.startswith("Count_") or k.startswith("Mean_")]
+                  if k.startswith("Count_") or k.startswith("Median_")]
     return parameters
 
 
@@ -1026,8 +1041,8 @@ def activity_profile(df, mad_mult=3.5, parameters=ACT_PROF_PARAMETERS, only_fina
     return result
 
 
-def relevant_parameters(df, ctrls_mad_rel_min=0.01,
-                        ctrls_mad_rel_max=0.1, use_cpds=True, times_mad=3.5):
+def relevant_parameters_bu(df, ctrls_mad_rel_min=0.01,
+                           ctrls_mad_rel_max=0.1, use_cpds=True, times_mad=3.5):
     """...mad_rel...: MAD relative to the median value"""
     relevant_table = FINAL_PARAMETERS.copy()
     # result = df.copy()
@@ -1078,9 +1093,42 @@ def relevant_parameters(df, ctrls_mad_rel_min=0.01,
     return result
 
 
+def relevant_parameters(df, ctrls_std_rel_min=0.001,
+                        ctrls_std_rel_max=0.1, ):
+    """...var_rel...: variance relative to the median value"""
+    relevant_table = FINAL_PARAMETERS.copy()
+    quant = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    # result = df.copy()
+    controls = df[df["WellType"] == "Control"].select_dtypes(include=[pd.np.number])
+
+    ds = controls.quantile(q=quant).std() / controls.median() >= ctrls_std_rel_min
+    ctrl_set = set([p for p in ds.keys() if ds[p]])
+    debug_print("ctrl_set", len(ctrl_set))
+
+    ds = controls.quantile(q=quant).std() / controls.median() <= ctrls_std_rel_max
+    tmp_set = set([p for p in ds.keys() if ds[p]])
+    debug_print("tmp_set", len(tmp_set))
+
+
+    ctrl_set.intersection_update(tmp_set)
+    debug_print("ctrl_set", len(ctrl_set))
+
+    relevant_table.extend(list(ctrl_set))
+    debug_print("relevant_table", len(relevant_table))
+
+    result_keys = list(df.keys())
+    keep = []
+    for key in result_keys:
+        if key in relevant_table:
+            keep.append(key)
+    result = df[keep]
+    debug_print("keep", len(keep))
+    return result
+
+
 def correlation_filter_poc(df, cutoff=0.9, method="pearson"):
     """Reduce the parameter set to only uncorrelated parameters. From a set of correlated
-    oarameters only the one with the highest Max(POC) is kept, all others are discarded."""
+    parameters only the one with the highest Max(POC) is kept, all others are discarded."""
     assert method in ["pearson", "kendall", "spearman"], 'method has to be one of ["pearson", "kendall", "spearman"]'
     assert "WellType" in df.keys()
 
@@ -1110,7 +1158,56 @@ def correlation_filter_poc(df, cutoff=0.9, method="pearson"):
 
         parameters_uncorr.append(keep_it)
         debug_print("keep_it", keep_it)
-        debug_print("num_corr.", len(equal_corr))
+        debug_print("num_corr.", ds[0])
+
+        # find the parameters actually correlated to `keep_it`
+        parameters_to_remove = list(correlated[keep_it][correlated[keep_it].notnull()].keys())
+        debug_print("param_to_rem", parameters_to_remove)
+
+        # remove the correlated parameters:
+        df_copy.drop(parameters_to_remove, axis=1, inplace=True)
+
+    parameters_uncorr.extend(df_copy.keys())
+    parameters_uncorr = list(set(parameters_uncorr))
+    # print("It took {} iterations to remove all correlated parameters.".format(iteration - 1))
+    return df[parameters_uncorr], iteration
+
+
+def correlation_filter_std(df, cutoff=0.9, method="pearson"):
+    """Reduce the parameter set to only uncorrelated parameters. From a set of correlated
+    parameters only the one with the lowest variance in the controls is kept,
+    all others are discarded."""
+    assert method in ["pearson", "kendall", "spearman"], 'method has to be one of ["pearson", "kendall", "spearman"]'
+    assert "WellType" in df.keys()
+
+    quant = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    # init the list of the uncorrelated parameters, incl. some string param.
+    parameters_uncorr = [p for p in FINAL_PARAMETERS if p in df]
+
+    df_copy = df.copy()
+    controls = df_copy[df_copy["WellType"] == "Control"]
+    controls_rel_std = controls.quantile(q=quant).std() / controls.median()
+    df_copy = df_copy.select_dtypes(include=[np.number])
+
+    iteration = 0
+    while True:
+        cm = df_copy.corr(method=method)
+        correlated = cm[cm > cutoff]
+        ds = correlated.count().sort_values(ascending=False)
+        if ds[0] == 1: break  # no more correlations
+        iteration += 1
+
+        equal_corr = ds[ds == ds[0]]
+        eq_keys = equal_corr.keys()
+        # from all columns with the same number of correlated columns,
+        # find the column with the highest POC range
+        # and keep that preferably
+
+        keep_it = controls_rel_std[eq_keys].sort_values(ascending=True).keys()[0]
+
+        parameters_uncorr.append(keep_it)
+        debug_print("keep_it", keep_it)
+        debug_print("num_corr.", ds[0])
 
         # find the parameters actually correlated to `keep_it`
         parameters_to_remove = list(correlated[keep_it][correlated[keep_it].notnull()].keys())
@@ -1269,12 +1366,12 @@ def well_id_similarity(df1, well_id1, df2, well_id2):
     return round(cpt.profile_sim(act1, act2), 3)
 
 
-def count_active_parameters_occurrences(df, parameters=ACT_PROF_PARAMETERS):
+def count_active_parameters_occurrences(df, act_prof="Act_Profile", parameters=ACT_PROF_PARAMETERS):
     """Counts the number of times each parameter has been active in the dataset."""
     ctr_int = Counter()
     ctr_str = {}
     for _, rec in df.iterrows():
-        for idx, b in enumerate(rec["Act_Profile"]):
+        for idx, b in enumerate(rec[act_prof]):
             if b != "1":
                 ctr_int[idx] += 1
     for k, val in ctr_int.items():
