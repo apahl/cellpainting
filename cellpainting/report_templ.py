@@ -16,7 +16,8 @@ from io import BytesIO as IO
 
 from PIL import Image
 
-from .config import (LIMIT_ACTIVITY_H, LIMIT_ACTIVITY_L,
+from .config import (ACT_CUTOFF_PERC,
+                     LIMIT_ACTIVITY_H, LIMIT_ACTIVITY_L,
                      LIMIT_CELL_COUNT_H, LIMIT_CELL_COUNT_L,
                      LIMIT_SIMILARITY_H, LIMIT_SIMILARITY_L)
 
@@ -728,9 +729,9 @@ HIGHLIGHT_LEGEND = """
 <table class=noborder id="table" width="" cellspacing="1" cellpadding="1" border="1" height="60" summary="">
 <tr>
     <td class=noborder>Activity Flag:</td>
-    <td bgcolor=§COL_GREEN>active</td>
+    <td bgcolor=§COL_GREEN>active<br>(Induction &ge; §ACT_CUTOFF_PERC%)</td>
     <td></td>
-    <td bgcolor=§COL_RED>inactive</td>
+    <td bgcolor=§COL_RED>inactive<br>(Induction &lt; §ACT_CUTOFF_PERC%)</td>
 </tr>
 <tr>
     <td class=noborder>Induction [%]:</td>
@@ -752,9 +753,9 @@ HIGHLIGHT_LEGEND = """
 </tr>
 <tr>
     <td class=noborder>Toxic:</td>
-    <td bgcolor=§COL_GREEN>No</td>
+    <td bgcolor=§COL_GREEN>No<br>(Cell Count &ge; §LIMIT_CELL_COUNT_L %Ctrl)</td>
     <td></td>
-    <td bgcolor=§COL_RED>Yes</td>
+    <td bgcolor=§COL_RED>Yes<br>(Cell Count &lt; §LIMIT_CELL_COUNT_L %Ctrl)</td>
 </tr>
 <tr>
     <td class=noborder>Cell Count [%Ctrl]:</td>
@@ -765,6 +766,7 @@ HIGHLIGHT_LEGEND = """
 d = {
     "TABLE_INTRO": TABLE_INTRO, "TABLE_EXTRO": TABLE_EXTRO,
     "COL_GREEN": COL_GREEN, "COL_YELLOW": COL_YELLOW, "COL_RED": COL_RED,
+    "ACT_CUTOFF_PERC": ACT_CUTOFF_PERC,
     "LIMIT_ACTIVITY_H": LIMIT_ACTIVITY_H, "LIMIT_ACTIVITY_L": LIMIT_ACTIVITY_L,
     "LIMIT_CELL_COUNT_H": LIMIT_CELL_COUNT_H, "LIMIT_CELL_COUNT_L": LIMIT_CELL_COUNT_L,
     "LIMIT_SIMILARITY_H": LIMIT_SIMILARITY_H, "LIMIT_SIMILARITY_L": LIMIT_SIMILARITY_L

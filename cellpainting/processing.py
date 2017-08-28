@@ -693,7 +693,7 @@ def position_from_well(df, well_name="Metadata_Well",
                        row_name="plateRow", col_name="plateColumn"):
     """Generate plateRow and plateColumn from Metatadata_Well"""
     def _position_from_well_series(well):
-        return(pd.Series(cpt.position_from_well_single(well)))
+        return (pd.Series(cpt.position_from_well_single(well)))
 
     result = df.copy()
     result[[row_name, col_name]] = result[well_name].apply(_position_from_well_series)

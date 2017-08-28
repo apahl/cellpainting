@@ -27,7 +27,7 @@ from . import tools as cpt
 from . import report_templ as cprt
 from . import processing as cpp
 from . import resource_paths as cprp
-from .config import (ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC,
+from .config import (ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC, ACT_CUTOFF_PERC_REF,
                      LIMIT_ACTIVITY_H, LIMIT_ACTIVITY_L,
                      LIMIT_CELL_COUNT_H, LIMIT_CELL_COUNT_L,
                      LIMIT_SIMILARITY_H, LIMIT_SIMILARITY_L)
@@ -258,7 +258,7 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
     if isinstance(df, cpp.DataSet):
         df = df.data
     if "ref" in mode:
-        act_cutoff = 5.0
+        act_cutoff = ACT_CUTOFF_PERC_REF
     else:
         act_cutoff = ACT_CUTOFF_PERC
     report = [cprt.OVERVIEW_TABLE_INTRO, cprt.OVERVIEW_TABLE_HEADER]
@@ -360,7 +360,7 @@ def changed_parameters_table(act_prof, val, parameters=ACT_PROF_PARAMETERS):
     for idx, p in enumerate(changed, 1):
         rec = {
             "idx": idx,
-            "Parameter": p[5:]
+            "Parameter": p[7:]
         }
         row = templ.substitute(rec)
         table.append(row)
