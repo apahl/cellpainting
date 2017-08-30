@@ -1132,7 +1132,7 @@ def correlation_filter_std(df, cutoff=0.9, method="pearson"):
 
     df_copy = df.copy()
     controls = df_copy[df_copy["WellType"] == "Control"]
-    controls_rel_std = controls.quantile(q=QUANT).std() / controls.median()
+    controls_median = controls.median()
     df_copy = df_copy.select_dtypes(include=[np.number])
 
     iteration = 0
@@ -1148,8 +1148,8 @@ def correlation_filter_std(df, cutoff=0.9, method="pearson"):
         # from all columns with the same number of correlated columns,
         # find the column with the highest POC range
         # and keep that preferably
-
-        keep_it = controls_rel_std[eq_keys].sort_values(ascending=True).keys()[0]
+        poc = (df_copy[eq_keys] / controls_median[eq_keys])
+        keep_it = (poc.max() - poc.min()).sort_values(ascending=False).keys()[0]
 
         parameters_uncorr.append(keep_it)
         debug_print("keep_it", keep_it)
