@@ -75,6 +75,7 @@ FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow'
 DROP_FROM_NUMBERS = ['plateColumn', 'plateRow', 'Conc_uM', "Compound_Id"]
 DROP_GLOBAL = ["PathName_CellOutlines", "URL_CellOutlines", 'FileName_CellOutlines',
                'ImageNumber', 'Metadata_Site', 'Metadata_Site_1', 'Metadata_Site_2']
+QUANT_CTRL = [0.05, 0.95]
 DEBUG = False
 
 
@@ -399,8 +400,9 @@ class DataSet():
         result = DataSet()
         result.data = relevant_parameters(self.data, ctrls_std_rel_min=ctrls_std_rel_min,
                                           ctrls_std_rel_max=ctrls_std_rel_max)
-        result.print_log("relevant parameters", "{:.3f}/{:.3f}".format(ctrls_std_rel_min,
-                                                                       ctrls_std_rel_max))
+        num_parm = len(result.measurements)
+        result.print_log("relevant parameters", "{:.3f}/{:.3f}/{:4d}"
+                         .format(ctrls_std_rel_min, ctrls_std_rel_max, num_parm))
         return result
 
 
@@ -428,7 +430,9 @@ class DataSet():
         Returns a new DataFrame with only the non-correlated columns"""
         result = DataSet()
         result.data, iterations = correlation_filter_std(self.data, cutoff=cutoff, method=method)
-        result.print_log("correlation filter", "{:3d} iterations".format(iterations))
+        num_parm = len(result.measurements)
+        result.print_log("correlation filter", "{:3d} iterations / {:4d} parameters"
+                         .format(iterations, num_parm))
         return result
 
 
@@ -1094,24 +1098,27 @@ def relevant_parameters_bu(df, ctrls_mad_rel_min=0.01,
 
 
 def relevant_parameters(df, ctrls_std_rel_min=0.001,
-                        ctrls_std_rel_max=0.1, ):
-    """...var_rel...: variance relative to the median value"""
+                        ctrls_std_rel_max=0.1, group_by="Plate"):
+    """...std_rel...: variance relative to the median value"""
     relevant_table = FINAL_PARAMETERS.copy()
-    quant = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-    # result = df.copy()
-    controls = df[df["WellType"] == "Control"].select_dtypes(include=[pd.np.number])
+    ctrl_set = set(df.keys())
+    plates = sorted(set(df[group_by]))
+    for plate in plates:
+        debug_print("Processing plate", plate)
+        controls = df[(df[group_by] == plate) & (df["WellType"] == "Control")].select_dtypes(include=[np.number])
+        median = controls.median()
+        std = controls.quantile(q=QUANT_CTRL).std()
 
-    ds = controls.quantile(q=quant).std() / controls.median() >= ctrls_std_rel_min
-    ctrl_set = set([p for p in ds.keys() if ds[p]])
-    debug_print("ctrl_set", len(ctrl_set))
+        ds = std / median >= ctrls_std_rel_min
+        tmp_set = set([p for p in ds.keys() if ds[p]])
+        ctrl_set.intersection_update(tmp_set)
+        debug_print("ctrl_set", len(ctrl_set))
 
-    ds = controls.quantile(q=quant).std() / controls.median() <= ctrls_std_rel_max
-    tmp_set = set([p for p in ds.keys() if ds[p]])
-    debug_print("tmp_set", len(tmp_set))
-
-
-    ctrl_set.intersection_update(tmp_set)
-    debug_print("ctrl_set", len(ctrl_set))
+        ds = std / median <= ctrls_std_rel_max
+        tmp_set = set([p for p in ds.keys() if ds[p]])
+        ctrl_set.intersection_update(tmp_set)
+        # debug_print("tmp_set", len(tmp_set))
+        debug_print("ctrl_set", len(ctrl_set))
 
     relevant_table.extend(list(ctrl_set))
     debug_print("relevant_table", len(relevant_table))
@@ -1126,53 +1133,6 @@ def relevant_parameters(df, ctrls_std_rel_min=0.001,
     return result
 
 
-def correlation_filter_poc(df, cutoff=0.9, method="pearson"):
-    """Reduce the parameter set to only uncorrelated parameters. From a set of correlated
-    parameters only the one with the highest Max(POC) is kept, all others are discarded."""
-    assert method in ["pearson", "kendall", "spearman"], 'method has to be one of ["pearson", "kendall", "spearman"]'
-    assert "WellType" in df.keys()
-
-    # init the list of the uncorrelated parameters, incl. some string param.
-    parameters_uncorr = [p for p in FINAL_PARAMETERS if p in df]
-
-    df_copy = df.copy()
-    median_controls = df_copy[df_copy["WellType"] == "Control"].median()
-    df_copy = df_copy.select_dtypes(include=[np.number])
-
-    iteration = 0
-    while True:
-        cm = df_copy.corr(method=method)
-        correlated = cm[cm > cutoff]
-        ds = correlated.count().sort_values(ascending=False)
-        if ds[0] == 1: break  # no more correlations
-        iteration += 1
-
-        equal_corr = ds[ds == ds[0]]
-        eq_keys = equal_corr.keys()
-        # from all columns with the same number of correlated columns,
-        # find the column with the highest POC range
-        # and keep that preferably
-
-        poc = (df_copy[eq_keys] / median_controls[eq_keys])
-        keep_it = (poc.max() - poc.min()).sort_values(ascending=False).keys()[0]
-
-        parameters_uncorr.append(keep_it)
-        debug_print("keep_it", keep_it)
-        debug_print("num_corr.", ds[0])
-
-        # find the parameters actually correlated to `keep_it`
-        parameters_to_remove = list(correlated[keep_it][correlated[keep_it].notnull()].keys())
-        debug_print("param_to_rem", parameters_to_remove)
-
-        # remove the correlated parameters:
-        df_copy.drop(parameters_to_remove, axis=1, inplace=True)
-
-    parameters_uncorr.extend(df_copy.keys())
-    parameters_uncorr = list(set(parameters_uncorr))
-    # print("It took {} iterations to remove all correlated parameters.".format(iteration - 1))
-    return df[parameters_uncorr], iteration
-
-
 def correlation_filter_std(df, cutoff=0.9, method="pearson"):
     """Reduce the parameter set to only uncorrelated parameters. From a set of correlated
     parameters only the one with the lowest variance in the controls is kept,
@@ -1180,13 +1140,12 @@ def correlation_filter_std(df, cutoff=0.9, method="pearson"):
     assert method in ["pearson", "kendall", "spearman"], 'method has to be one of ["pearson", "kendall", "spearman"]'
     assert "WellType" in df.keys()
 
-    quant = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     # init the list of the uncorrelated parameters, incl. some string param.
     parameters_uncorr = [p for p in FINAL_PARAMETERS if p in df]
 
-    df_copy = df.copy()
-    controls = df_copy[df_copy["WellType"] == "Control"]
-    controls_rel_std = controls.quantile(q=quant).std() / controls.median()
+    df_copy = df[df["WellType"] == "Compound"].copy()  # ONLY COMPOUNDS !!!!
+    controls = df[df["WellType"] == "Control"].copy()
+    controls_rel_std = controls.quantile(q=QUANT_CTRL).std() / controls.median()
     df_copy = df_copy.select_dtypes(include=[np.number])
 
     iteration = 0
@@ -1203,7 +1162,7 @@ def correlation_filter_std(df, cutoff=0.9, method="pearson"):
         # find the column with the highest POC range
         # and keep that preferably
 
-        keep_it = controls_rel_std[eq_keys].sort_values(ascending=True).keys()[0]
+        keep_it = controls_rel_std[eq_keys].sort_values(ascending=False).keys()[0]
 
         parameters_uncorr.append(keep_it)
         debug_print("keep_it", keep_it)
