@@ -1132,6 +1132,53 @@ def correlation_filter_std(df, cutoff=0.9, method="pearson"):
 
     df_copy = df.copy()
     controls = df_copy[df_copy["WellType"] == "Control"]
+    controls_rel_std = controls.quantile(q=QUANT).std() / controls.median()
+    df_copy = df_copy.select_dtypes(include=[np.number])
+
+    iteration = 0
+    while True:
+        cm = df_copy.corr(method=method)
+        correlated = cm[cm > cutoff]
+        ds = correlated.count().sort_values(ascending=False)
+        if ds[0] == 1: break  # no more correlations
+        iteration += 1
+
+        equal_corr = ds[ds == ds[0]]
+        eq_keys = equal_corr.keys()
+        # from all columns with the same number of correlated columns,
+        # find the column with the highest POC range
+        # and keep that preferably
+        keep_it = controls_rel_std[eq_keys].sort_values(ascending=True).keys()[0]
+
+        parameters_uncorr.append(keep_it)
+        debug_print("keep_it", keep_it)
+        debug_print("num_corr.", ds[0])
+
+        # find the parameters actually correlated to `keep_it`
+        parameters_to_remove = list(correlated[keep_it][correlated[keep_it].notnull()].keys())
+        debug_print("param_to_rem", parameters_to_remove)
+
+        # remove the correlated parameters:
+        df_copy.drop(parameters_to_remove, axis=1, inplace=True)
+
+    parameters_uncorr.extend(df_copy.keys())
+    parameters_uncorr = list(set(parameters_uncorr))
+    # print("It took {} iterations to remove all correlated parameters.".format(iteration - 1))
+    return df[parameters_uncorr], iteration
+
+
+def correlation_filter_std_old(df, cutoff=0.9, method="pearson"):
+    """Reduce the parameter set to only uncorrelated parameters. From a set of correlated
+    parameters only the one with the lowest variance in the controls is kept,
+    all others are discarded."""
+    assert method in ["pearson", "kendall", "spearman"], 'method has to be one of ["pearson", "kendall", "spearman"]'
+    assert "WellType" in df.keys()
+
+    # init the list of the uncorrelated parameters, incl. some string param.
+    parameters_uncorr = [p for p in FINAL_PARAMETERS if p in df]
+
+    df_copy = df.copy()
+    controls = df_copy[df_copy["WellType"] == "Control"]
     controls_median = controls.median()
     df_copy = df_copy.select_dtypes(include=[np.number])
 
