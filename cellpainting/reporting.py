@@ -252,6 +252,8 @@ def remove_colors(rec):
 
 def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
                     highlight=False, mode="cpd"):
+    """mode `int` displays similarities not to references but to other internal compounds
+    (just displays the `Similarity` column)."""
     cpp.load_resource("SIM_REFS")
     sim_refs = cpp.SIM_REFS
     detailed_cpds = []
@@ -261,7 +263,12 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
         act_cutoff = ACT_CUTOFF_PERC_REF
     else:
         act_cutoff = ACT_CUTOFF_PERC
-    report = [cprt.OVERVIEW_TABLE_INTRO, cprt.OVERVIEW_TABLE_HEADER]
+    t = Template(cprt.OVERVIEW_TABLE_HEADER)
+    if "int" in mode:
+        tbl_header = t.substitute(sim_entity="to another Test Compound")
+    else:
+        tbl_header = t.substitute(sim_entity="to a Reference")
+    report = [cprt.OVERVIEW_TABLE_INTRO, tbl_header]
     row_templ = Template(cprt.OVERVIEW_TABLE_ROW)
     idx = 0
     for _, rec in df.iterrows():
@@ -292,8 +299,14 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
         if has_details:
             well_id = rec["Well_Id"]
             detailed_cpds.append(well_id)
-            if well_id in sim_refs:
-                similar = sim_refs[well_id]
+            similar = None
+            if "int" in mode:
+                similar = {"Similarity": [rec["Similarity"]]}
+            else:
+                if well_id in sim_refs:
+                    similar = sim_refs[well_id]
+
+            if similar is not None:
                 if len(similar) > 0:
                     max_sim = round(
                         similar["Similarity"][0] * 100, 1)  # first in the list has the highest similarity

@@ -698,7 +698,7 @@ OVERVIEW_TABLE_HEADER = """
     <th>Producer</th>
     <th>Activity<br>Flag</th>
     <th>Induction [%]</th>
-    <th>Highest Similarity<br>to a Reference [%]</th>
+    <th>Highest Similarity<br>$sim_entity [%]</th>
     <th>Purity<br>Flag</th>
     <th>Toxic</th>
     <th title="relative cell count in percent\nbased on the median cell count\nof the controls">
