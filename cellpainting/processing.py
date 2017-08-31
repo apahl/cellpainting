@@ -1217,7 +1217,7 @@ def correlation_filter_std_old(df, cutoff=0.9, method="pearson"):
 
 def find_similar(df, act_profile, cutoff=0.5, max_num=3):
     """Filter the dataframe for activity profiles similar to the given one.
-    `cutoff` gives the similarity threshold, default is 0.6."""
+    `cutoff` gives the similarity threshold, default is 0.5."""
     decimals = {"Similarity": 3}
     result = df.copy()
     result["Similarity"] = result["Act_Profile"].apply(lambda x: cpt.profile_sim(x,

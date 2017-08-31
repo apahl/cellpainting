@@ -115,6 +115,11 @@ def print_dir(obj):
             print(f)
 
 
+def print_iter(l):
+    for x in l:
+        print(x)
+
+
 def create_dirs(path):
     if not op.exists(path):
         os.makedirs(path)
