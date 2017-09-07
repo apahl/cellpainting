@@ -15,7 +15,7 @@ import os.path as op
 from string import Template
 from io import BytesIO as IO
 
-# import pandas as pd
+import pandas as pd
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import Draw
 
@@ -280,33 +280,33 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
             rec["Pure_Flag"] = "n.d."
 
         has_details = True
+        # similar references are searched for non-toxic compounds with an activity >= LIMIT_ACTIVITY_L
+        if rec["Activity"] < LIMIT_ACTIVITY_L or rec["Toxic"]:
+            similars_determined = False
+        else:
+            similars_determined = True
         rec["Act_Flag"] = "active"
-        if rec["Toxic"]:
-            has_details = False
-            rec["Max_Sim"] = ""
-            rec["Link"] = ""
-            rec["Col_Sim"] = cprt.COL_WHITE
+        rec["Max_Sim"] = ""
+        rec["Link"] = ""
+        rec["Col_Sim"] = cprt.COL_WHITE
         if rec["Activity"] < act_cutoff:
             has_details = False
             rec["Act_Flag"] = "inactive"
-            rec["Max_Sim"] = ""
-            rec["Link"] = ""
-            rec["Col_Sim"] = cprt.COL_WHITE
         # print(rec)
         assign_colors(rec)
         convert_bool(rec, "Toxic")
 
         if has_details:
-            well_id = rec["Well_Id"]
-            detailed_cpds.append(well_id)
-            similar = None
-            if "int" in mode:
-                similar = {"Similarity": [rec["Similarity"]]}
-            else:
-                if well_id in sim_refs:
-                    similar = sim_refs[well_id]
+            if similars_determined:
+                well_id = rec["Well_Id"]
+                detailed_cpds.append(well_id)
+                if "int" in mode:
+                    # similar = {"Similarity": [rec["Similarity"]]}
+                    similar = pd.DataFrame({"Well_Id": [well_id], "Similarity": [rec["Similarity"]]})
+                else:
+                    similar = sim_refs[sim_refs["Well_Id"] == well_id].sort_values("Similarity",
+                                                                                   ascending=False)
 
-            if similar is not None:
                 if len(similar) > 0:
                     max_sim = round(
                         similar["Similarity"][0] * 100, 1)  # first in the list has the highest similarity
@@ -321,9 +321,6 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
                 else:
                     rec["Max_Sim"] = "< {}".format(LIMIT_SIMILARITY_L)
                     rec["Col_Sim"] = cprt.COL_RED
-            else:
-                rec["Max_Sim"] = ""
-                rec["Col_Sim"] = cprt.COL_WHITE
 
             details_fn = sanitize_filename(well_id)
             if rec.get("Is_Ref", False):
@@ -344,12 +341,9 @@ def sim_ref_table(similar):
     df_refs = cpp.REFERENCES
     table = [cprt.TABLE_INTRO, cprt.REF_TABLE_HEADER]
     templ = Template(cprt.REF_TABLE_ROW)
-    for idx in range(len(similar["Well_Id"])):
-        rec = {}
-        well_id = similar["Well_Id"][idx]
-        rec["Well_Id"] = well_id
-        rec["Similarity"] = similar["Similarity"][idx]
-        ref_data = df_refs[df_refs["Well_Id"] == well_id]
+    for _, rec in similar.iterrows():
+        ref_id = rec["Ref_Id"]
+        ref_data = df_refs[df_refs["Well_Id"] == ref_id]
         ref_data = ref_data.copy()
         ref_data = ref_data.fillna("&mdash;")
         rec.update(ref_data.to_dict("records")[0])
@@ -486,28 +480,24 @@ def detailed_report(rec, src_dir, ctrl_images):
         templ_dict["Reference"] = t.substitute(templ_dict)
     else:
         templ_dict["Reference"] = ""
-
     well = rec["Metadata_Well"]
     for ch in range(1, 6):
         im = load_image(image_dir, well, ch)
         templ_dict["Img_{}_Cpd".format(ch)] = img_tag(im, options='style="width: 250px;"')
         templ_dict["Img_{}_Ctrl".format(ch)] = ctrl_images[ch]
-    if well_id in sim_refs:
-        similar = sim_refs[well_id]
-        if len(similar) > 0:
-            ref_tbl = sim_ref_table(similar)
-            templ_dict["Ref_Table"] = ref_tbl
+        similar = sim_refs[sim_refs["Well_Id"] == well_id].sort_values("Similarity", ascending=False)
+    if len(similar) > 0:
+        ref_tbl = sim_ref_table(similar)
+        templ_dict["Ref_Table"] = ref_tbl
+    else:
+        if rec["Activity"] < LIMIT_ACTIVITY_L:
+            templ_dict["Ref_Table"] = "Because of low activity, no similarity was determined."
+        elif rec["Rel_Cell_Count"] < LIMIT_CELL_COUNT_L:
+            templ_dict["Ref_Table"] = "Because of compound toxicity, no similarity was determined."
         else:
             templ_dict["Ref_Table"] = "No similar references found."
-    else:
-        if rec["Activity"] < ACT_CUTOFF_PERC:
-            templ_dict["Ref_Table"] = "Because of low activity, no similarity was determined."
-        else:
-            # this should not happen:
-            templ_dict["Ref_Table"] = "### BUG! Please notify Axel."
 
     t = Template(cprt.DETAILS_TEMPL)
-
     report = t.substitute(templ_dict)
     return report
 

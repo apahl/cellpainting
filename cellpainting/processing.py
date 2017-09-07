@@ -9,22 +9,7 @@ Processing
 
 Processing results from the CellPainting Assay in the Jupyter notebook.
 This module provides the DataSet class and its methods.
-Additional functions in this module act on pandas DataFrames.
-convert 170512_B03_s5_w149D3C0B4-85CE-42BE-AB4F-1B460BEECC73.tif -resize 200x200 -negate 170512_B03_s5_w1.png
-
-# invert image:
-from PIL import Image
-import PIL.ImageOps
-image = Image.open('your_image.png')
-inverted_image = PIL.ImageOps.invert(image)
-inverted_image.save('new_name.png')
-
-# resize an image
-size = (200, 200)
-im = Image.open(infile)
-im.thumbnail(size, Image.ANTIALIAS)
-im.save(outfile, "JPEG")
-"""
+Additional functions in this module act on pandas DataFrames."""
 
 import time
 import glob
@@ -36,11 +21,13 @@ import pickle
 import pandas as pd
 import numpy as np
 
+from rdkit.Chem import AllChem as Chem
+
 from IPython.core.display import HTML
 
 from . import tools as cpt
 from .config import ACT_PROF_PARAMETERS
-from .config import ACT_CUTOFF_PERC, LIMIT_SIMILARITY_L
+from .config import ACT_CUTOFF_PERC, LIMIT_SIMILARITY_L, LIMIT_CELL_COUNT_L
 
 try:
     from misc_tools import apl_tools
@@ -257,7 +244,7 @@ class DataSet():
         return result
 
 
-    def flag_toxic(self, cutoff=0.55):
+    def flag_toxic(self, cutoff=LIMIT_CELL_COUNT_L):
         """Flag data rows of toxic compounds"""
         result = DataSet()
         result.data = flag_toxic(self.data, cutoff=cutoff)
@@ -607,10 +594,10 @@ def load_resource(resource, mode="cpd"):
             else:
                 srp = resource_paths.sim_refs_path
             try:
-                SIM_REFS = load_obj(srp)
+                SIM_REFS = pd.read_csv(srp, sep="\t")
             except FileNotFoundError:
                 print("  * SIM_REFS not found, creating new one.")
-                SIM_REFS = {}
+                SIM_REFS = pd.DataFrame()
     elif "ref" in res:
         if "REFERENCES" not in glbls:
             global REFERENCES
@@ -853,7 +840,7 @@ def numeric_parameters(df):
     return result
 
 
-def flag_toxic(df, cutoff=0.55):
+def flag_toxic(df, cutoff=LIMIT_CELL_COUNT_L):
     """Flag data rows of toxic compounds"""
     result = df.copy()
     median_cell_count_controls = df[df["WellType"] == "Control"]["Count_Cells"].median()
@@ -1238,12 +1225,12 @@ def write_obj(obj, fn):
 def write_sim_refs(mode="cpd"):
     """Export of sim_refs as pkl and as tsv for PPilot"""
     if "ext" in mode.lower():
-        sim_fn_pkl = resource_paths.sim_refs_ext_path
+        sim_fn = resource_paths.sim_refs_ext_path
     else:
-        sim_fn_pkl = resource_paths.sim_refs_path
-    sim_fn_pp = op.splitext(sim_fn_pkl)[0] + ".tsv"
+        sim_fn = resource_paths.sim_refs_path
+    sim_fn_pp = op.splitext(sim_fn)[0] + "_pp.tsv"
     sim_refs = SIM_REFS
-    write_obj(sim_refs, sim_fn_pkl)  # pkl for internal use, the resource should be loaded at this point
+    sim_refs.to_csv(sim_fn, sep="\t")  # the resource should be loaded at this point
     d = {"Well_Id": [], "Highest_Sim": []}
     for container_id in sim_refs:
         similar = sim_refs[container_id]
@@ -1266,18 +1253,17 @@ def load_obj(fn):
 
 def update_similar_refs(df, mode="cpd", write=True):
     """Find similar compounds in references and update the export file.
-    The export file of the dict object is in pkl format. In addition,
-    a tsv file (or maybe JSON?) is written for use in PPilot.
+    The export file of the DataFrame object is in tsv format. In addition,
+    another tsv file (or maybe JSON?) is written for use in PPilot.
     `mode` can be "cpd" or "ref". if `sim_refs`is not None,
     it has to be a dict of the correct format.
     With `write=False`, the writing of the file can be deferred to the end of the processing pipeline,
     but has to be done manually, then, with `write_sim_refs()`."""
-
+    global SIM_REFS
     load_resource("REFERENCES")
     load_resource("SIM_REFS", mode=mode)
     df_refs = REFERENCES
     sim_refs = SIM_REFS
-
     for _, rec in df.iterrows():
         if rec["Activity"] < ACT_CUTOFF_PERC or rec["Toxic"]:
             # no similarites for inactive or toxic compounds
@@ -1288,13 +1274,15 @@ def update_similar_refs(df, mode="cpd", write=True):
             max_num += 1
         similar = find_similar(df_refs, act_profile, cutoff=LIMIT_SIMILARITY_L / 100, max_num=max_num)
         similar = similar[["Well_Id", "Similarity"]]
+        similar = similar.rename(columns={"Well_Id": "Ref_Id"})
         if "ref" in mode:
             similar.drop(similar.head(1).index, inplace=True)
-        if similar.shape[0] == 0:
-            ref_dict = {}
-        else:
-            ref_dict = similar.to_dict("list")
-        sim_refs[rec["Well_Id"]] = ref_dict
+        if len(sim_refs) > 0:
+
+            sim_refs = sim_refs.append(similar, ignore_index=True)
+            sim_refs = sim_refs.drop_duplicates(subset=["Well_Id", "Ref_Id"], keep="last")
+    SIM_REFS = sim_refs
+
     if write:
         # with write=False, the writing can be deferred to the end of the processing pipeline,
         # but has to be done manually, then.
