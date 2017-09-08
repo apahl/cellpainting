@@ -783,6 +783,7 @@ REF_TABLE_HEADER = """
     <th>Induction [%]</th>
     <th title="Activity Profile similarity to the compound shown on top.">Biological<br>Similarity&nbsp;[%]</th>
     <th title="Chemical Tanimoto similarity to the compound shown on top.">Chemical<br>Similarity&nbsp;[%]</th>
+    <th title="The number of times this reference has been found similar by RESEARCH compounds.">Times<br>Found</th>
     <th>Trivial Name</th>
     <th class="left">Known Activity</th>
 </tr>"""
@@ -792,10 +793,11 @@ REF_TABLE_ROW = """
     <td>$idx</td>
     <td><a href="../../references/details/$link.html" ppLO="wpNT">$mol_img</a></td>
     <td>$Well_Id</td>
-    <td>${Conc_uM}</td>
-    <td>$Activity</td>
+    <td title="Conc [&micro;M]">${Conc_uM}</td>
+    <td title="Induction [%]>$Activity</td>
     <td title="Activity Profile similarity to the compound shown on top.">$Sim_Format</td>
     <td title="Chemical Tanimoto similarity to the compound shown on top.">$Tan_Format</td>
+    <td title="The number of times this reference has been found similar by RESEARCH compounds.">$Times_Found</td>
     <td>$Trivial_Name</td>
     <td class="left">$Known_Act</td>
 </tr>"""

@@ -1224,7 +1224,8 @@ def write_obj(obj, fn):
 def write_sim_refs(mode="cpd"):
     """Export of sim_refs as pkl and as tsv for PPilot"""
     global SIM_REFS
-    keep = ["Compound_Id", "Well_Id", "Ref_Id", "RefCpd_Id", "Similarity", "Tanimoto"]
+    keep = ["Compound_Id", "Well_Id", "Is_Ref", "Ref_Id", "RefCpd_Id",
+            "Similarity", "Tanimoto", "Times_Found"]
     if "ext" in mode.lower():
         sim_fn = resource_paths.sim_refs_ext_path
     else:
@@ -1271,6 +1272,7 @@ def update_similar_refs(df, mode="cpd", write=True):
         return np.nan
 
     global SIM_REFS
+    mode = mode.lower()
     load_resource("REFERENCES")
     load_resource("SIM_REFS", mode=mode)
     df_refs = REFERENCES
@@ -1290,6 +1292,10 @@ def update_similar_refs(df, mode="cpd", write=True):
             similar = similar[["Well_Id", "Compound_Id", "Similarity", "Smiles"]]
             similar = similar.rename(columns={"Well_Id": "Ref_Id", "Compound_Id": "RefCpd_Id"})
             similar["Well_Id"] = rec["Well_Id"]
+            if "ref" in mode:
+                similar["Is_Ref"] = True
+            else:
+                similar["Is_Ref"] = False
             similar["Compound_Id"] = rec["Compound_Id"]
             mol = mol_from_smiles(rec.get("Smiles", "*"))
             if len(mol.GetAtoms()) > 1:
@@ -1299,8 +1305,19 @@ def update_similar_refs(df, mode="cpd", write=True):
                 similar["Tanimoto"] = np.nan
             sim_refs = sim_refs.append(similar, ignore_index=True)
             sim_refs = sim_refs.drop_duplicates(subset=["Well_Id", "Ref_Id"], keep="last")
-    SIM_REFS = sim_refs
 
+    # Assign the number of times a reference was found by a research compound
+    drop_cols(sim_refs, ["Times_Found"], inplace=True)
+    tmp = sim_refs.copy()
+    tmp = tmp[~tmp["Is_Ref"]]
+    tmp = tmp.groupby(by="Ref_Id").count().reset_index()
+    # "Compound_Id" is just one field that contains the correct count:
+    tmp = tmp[["Ref_Id", "Compound_Id"]]
+    tmp = tmp.rename(columns={"Compound_Id": "Times_Found"})
+    sim_refs = pd.merge(sim_refs, tmp, on="Ref_Id", how="left")
+    sim_refs = sim_refs.fillna(0)
+    sim_refs["Times_Found"] = sim_refs["Times_Found"].astype(int)
+    SIM_REFS = sim_refs
     if write:
         # with write=False, the writing can be deferred to the end of the processing pipeline,
         # but has to be done manually, then.
