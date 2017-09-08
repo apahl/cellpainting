@@ -22,12 +22,13 @@ import pandas as pd
 import numpy as np
 
 from rdkit.Chem import AllChem as Chem
+from rdkit import DataStructs
 
 from IPython.core.display import HTML
 
 from . import tools as cpt
 from .config import ACT_PROF_PARAMETERS
-from .config import ACT_CUTOFF_PERC, LIMIT_SIMILARITY_L, LIMIT_CELL_COUNT_L
+from .config import LIMIT_SIMILARITY_L, LIMIT_CELL_COUNT_L, LIMIT_ACTIVITY_L
 
 try:
     from misc_tools import apl_tools
@@ -244,7 +245,7 @@ class DataSet():
         return result
 
 
-    def flag_toxic(self, cutoff=LIMIT_CELL_COUNT_L):
+    def flag_toxic(self, cutoff=LIMIT_CELL_COUNT_L / 100):
         """Flag data rows of toxic compounds"""
         result = DataSet()
         result.data = flag_toxic(self.data, cutoff=cutoff)
@@ -253,7 +254,7 @@ class DataSet():
         return result
 
 
-    def remove_toxic(self, cutoff=0.55):
+    def remove_toxic(self, cutoff=LIMIT_CELL_COUNT_L / 100):
         """Remove data rows of toxic compounds"""
         result = DataSet()
         toxic = DataSet()
@@ -752,8 +753,6 @@ def update_datastore(df2, on="Well_Id", mode="cpd", write=False):
     rem = "" if write else "write is off"
     print_log(df2, "update datastore", rem)
     DATASTORE = df1.drop_duplicates(subset=on, keep="last")
-    print("df1:      ", df1.shape)
-    print("DATASTORE:", DATASTORE.shape)
     if write:
         write_datastore()
 
@@ -840,7 +839,7 @@ def numeric_parameters(df):
     return result
 
 
-def flag_toxic(df, cutoff=LIMIT_CELL_COUNT_L):
+def flag_toxic(df, cutoff=LIMIT_CELL_COUNT_L / 100):
     """Flag data rows of toxic compounds"""
     result = df.copy()
     median_cell_count_controls = df[df["WellType"] == "Control"]["Count_Cells"].median()
@@ -849,7 +848,7 @@ def flag_toxic(df, cutoff=LIMIT_CELL_COUNT_L):
     return result
 
 
-def remove_toxic(df, cutoff=0.55):
+def remove_toxic(df, cutoff=LIMIT_CELL_COUNT_L / 100):
     """Remove data rows of toxic compounds"""
     if "Toxic" not in df.keys():
         flagged = flag_toxic(df, cutoff=cutoff)
@@ -1224,24 +1223,20 @@ def write_obj(obj, fn):
 
 def write_sim_refs(mode="cpd"):
     """Export of sim_refs as pkl and as tsv for PPilot"""
+    global SIM_REFS
+    keep = ["Compound_Id", "Well_Id", "Ref_Id", "RefCpd_Id", "Similarity", "Tanimoto"]
     if "ext" in mode.lower():
         sim_fn = resource_paths.sim_refs_ext_path
     else:
         sim_fn = resource_paths.sim_refs_path
     sim_fn_pp = op.splitext(sim_fn)[0] + "_pp.tsv"
+    SIM_REFS = SIM_REFS[keep]
     sim_refs = SIM_REFS
-    sim_refs.to_csv(sim_fn, sep="\t")  # the resource should be loaded at this point
-    d = {"Well_Id": [], "Highest_Sim": []}
-    for container_id in sim_refs:
-        similar = sim_refs[container_id]
-        if len(similar) > 0:
-            highest_sim = similar["Similarity"][0]
-        else:
-            highest_sim = 0
-        d["Well_Id"].append(container_id)
-        d["Highest_Sim"].append(highest_sim)
-    df = pd.DataFrame(d)
-    df.to_csv(sim_fn_pp, sep="\t")  # tsv for PPilot
+    sim_refs.to_csv(sim_fn, sep="\t", index=False)  # the resource should be loaded at this point
+    df = sim_refs.sort_values("Similarity", ascending=False)
+    df = df.drop_duplicates(subset="Well_Id", keep="first")
+    df = df.rename(columns={"Similarity": "Highest_Sim"})
+    df.to_csv(sim_fn_pp, sep="\t", index=False)  # tsv for PPilot
     print("* {:22s} ({:5d} |  --  )".format("write sim_refs", len(sim_refs)))
 
 
@@ -1249,6 +1244,15 @@ def load_obj(fn):
     with open(fn, "rb") as f:
         obj = pickle.load(f)
     return obj
+
+
+def mol_from_smiles(smi):
+    if not isinstance(smi, str):
+        smi = "*"
+    mol = Chem.MolFromSmiles(smi)
+    if not mol:
+        mol = Chem.MolFromSmiles("*")
+    return mol
 
 
 def update_similar_refs(df, mode="cpd", write=True):
@@ -1259,26 +1263,40 @@ def update_similar_refs(df, mode="cpd", write=True):
     it has to be a dict of the correct format.
     With `write=False`, the writing of the file can be deferred to the end of the processing pipeline,
     but has to be done manually, then, with `write_sim_refs()`."""
+    def _chem_sim(mol_fp, query_smi):
+        query = mol_from_smiles(query_smi)
+        if len(query.GetAtoms()) > 1:
+            query_fp = Chem.GetMorganFingerprint(query, 2)  # ECFC4
+            return round(DataStructs.TanimotoSimilarity(mol_fp, query_fp), 3)
+        return np.nan
+
     global SIM_REFS
     load_resource("REFERENCES")
     load_resource("SIM_REFS", mode=mode)
     df_refs = REFERENCES
     sim_refs = SIM_REFS
     for _, rec in df.iterrows():
-        if rec["Activity"] < ACT_CUTOFF_PERC or rec["Toxic"]:
-            # no similarites for inactive or toxic compounds
+        if rec["Activity"] < LIMIT_ACTIVITY_L or rec["Toxic"]:
+            # no similarites for low active or toxic compounds
             continue
         act_profile = rec["Act_Profile"]
         max_num = 5
         if "ref" in mode:
             max_num += 1
         similar = find_similar(df_refs, act_profile, cutoff=LIMIT_SIMILARITY_L / 100, max_num=max_num)
-        similar = similar[["Well_Id", "Similarity"]]
-        similar = similar.rename(columns={"Well_Id": "Ref_Id"})
         if "ref" in mode:
             similar.drop(similar.head(1).index, inplace=True)
-        if len(sim_refs) > 0:
-
+        if len(similar) > 0:
+            similar = similar[["Well_Id", "Compound_Id", "Similarity", "Smiles"]]
+            similar = similar.rename(columns={"Well_Id": "Ref_Id", "Compound_Id": "RefCpd_Id"})
+            similar["Well_Id"] = rec["Well_Id"]
+            similar["Compound_Id"] = rec["Compound_Id"]
+            mol = mol_from_smiles(rec.get("Smiles", "*"))
+            if len(mol.GetAtoms()) > 1:
+                mol_fp = Chem.GetMorganFingerprint(mol, 2)  # ECFC4
+                similar["Tanimoto"] = similar["Smiles"].apply(lambda q: _chem_sim(mol_fp, q))
+            else:
+                similar["Tanimoto"] = np.nan
             sim_refs = sim_refs.append(similar, ignore_index=True)
             sim_refs = sim_refs.drop_duplicates(subset=["Well_Id", "Ref_Id"], keep="last")
     SIM_REFS = sim_refs

@@ -781,7 +781,8 @@ REF_TABLE_HEADER = """
     <th>Well Id</th>
     <th>Conc [&micro;M]</th>
     <th>Induction [%]</th>
-    <th title="Profile similarity to the compound shown on top.">Similarity&nbsp;[%]</th>
+    <th title="Activity Profile similarity to the compound shown on top.">Biological<br>Similarity&nbsp;[%]</th>
+    <th title="Chemical Tanimoto similarity to the compound shown on top.">Chemical<br>Similarity&nbsp;[%]</th>
     <th>Trivial Name</th>
     <th class="left">Known Activity</th>
 </tr>"""
@@ -793,7 +794,8 @@ REF_TABLE_ROW = """
     <td>$Well_Id</td>
     <td>${Conc_uM}</td>
     <td>$Activity</td>
-    <td>$Sim_Format</td>
+    <td title="Activity Profile similarity to the compound shown on top.">$Sim_Format</td>
+    <td title="Chemical Tanimoto similarity to the compound shown on top.">$Tan_Format</td>
     <td>$Trivial_Name</td>
     <td class="left">$Known_Act</td>
 </tr>"""

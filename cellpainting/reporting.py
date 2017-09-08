@@ -273,40 +273,46 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
     idx = 0
     for _, rec in df.iterrows():
         idx += 1
+        well_id = rec["Well_Id"]
         mol = mol_from_smiles(rec.get("Smiles", "*"))
         rec["mol_img"] = mol_img_tag(mol)
         rec["idx"] = idx
         if "Pure_Flag" not in rec:
             rec["Pure_Flag"] = "n.d."
 
+        rec["Act_Flag"] = "active"
+        rec["Max_Sim"] = ""
+        rec["Link"] = ""
+        rec["Col_Sim"] = cprt.COL_WHITE
         has_details = True
+        if rec["Activity"] < act_cutoff:
+            has_details = False
+            rec["Act_Flag"] = "inactive"
+        # print(rec)
         # similar references are searched for non-toxic compounds with an activity >= LIMIT_ACTIVITY_L
         if rec["Activity"] < LIMIT_ACTIVITY_L or rec["Toxic"]:
             similars_determined = False
         else:
             similars_determined = True
-        rec["Act_Flag"] = "active"
-        rec["Max_Sim"] = ""
-        rec["Link"] = ""
-        rec["Col_Sim"] = cprt.COL_WHITE
-        if rec["Activity"] < act_cutoff:
-            has_details = False
-            rec["Act_Flag"] = "inactive"
-        # print(rec)
         assign_colors(rec)
         convert_bool(rec, "Toxic")
 
         if has_details:
+            detailed_cpds.append(well_id)
+            details_fn = sanitize_filename(well_id)
+            if rec.get("Is_Ref", False):
+                plate = "references"
+            else:
+                plate = rec["Plate"]
+            rec["Link"] = '<a href="../{}/details/{}.html">Detailed<br>Report</a>'.format(plate, details_fn)
             if similars_determined:
-                well_id = rec["Well_Id"]
-                detailed_cpds.append(well_id)
                 if "int" in mode:
                     # similar = {"Similarity": [rec["Similarity"]]}
                     similar = pd.DataFrame({"Well_Id": [well_id], "Similarity": [rec["Similarity"]]})
                 else:
-                    similar = sim_refs[sim_refs["Well_Id"] == well_id].sort_values("Similarity",
-                                                                                   ascending=False)
-
+                    similar = (sim_refs[sim_refs["Well_Id"] == well_id]
+                               .sort_values("Similarity", ascending=False)
+                               .reset_index())
                 if len(similar) > 0:
                     max_sim = round(
                         similar["Similarity"][0] * 100, 1)  # first in the list has the highest similarity
@@ -322,12 +328,6 @@ def overview_report(df, cutoff=LIMIT_SIMILARITY_L / 100,
                     rec["Max_Sim"] = "< {}".format(LIMIT_SIMILARITY_L)
                     rec["Col_Sim"] = cprt.COL_RED
 
-            details_fn = sanitize_filename(well_id)
-            if rec.get("Is_Ref", False):
-                plate = "references"
-            else:
-                plate = rec["Plate"]
-            rec["Link"] = '<a href="../{}/details/{}.html">Detailed<br>Report</a>'.format(plate, details_fn)
         if not highlight:
             # remove all coloring again:
             remove_colors(rec)
@@ -341,14 +341,20 @@ def sim_ref_table(similar):
     df_refs = cpp.REFERENCES
     table = [cprt.TABLE_INTRO, cprt.REF_TABLE_HEADER]
     templ = Template(cprt.REF_TABLE_ROW)
-    for _, rec in similar.iterrows():
+    for idx, rec in similar.iterrows():
+        rec = rec.to_dict()
         ref_id = rec["Ref_Id"]
         ref_data = df_refs[df_refs["Well_Id"] == ref_id]
+        if len(ref_data) == 0:
+            raise ValueError("BUG: ref_data should not be empty.")
         ref_data = ref_data.copy()
         ref_data = ref_data.fillna("&mdash;")
         rec.update(ref_data.to_dict("records")[0])
         mol = mol_from_smiles(rec.get("Smiles", "*"))
         rec["Sim_Format"] = "{:.1f}".format(rec["Similarity"] * 100)
+        rec["Tan_Format"] = "{:.1f}".format(rec["Tanimoto"] * 100)
+        if rec["Tan_Format"] == np.nan:
+            rec["Tan_Format"] = "&mdash;"
         rec["mol_img"] = mol_img_tag(mol)
         rec["idx"] = idx + 1
 
@@ -395,6 +401,9 @@ def parm_hist(increased, decreased):
     inc_max = max(increased)
     dec_max = max(decreased)
     max_total = max([inc_max, dec_max])
+    if max_total == 0:
+        result = "No compartment-specific parameters were changed."
+        return result
     inc_norm = [v / max_total for v in increased]
     dec_norm = [v / max_total for v in decreased]
 
@@ -485,15 +494,17 @@ def detailed_report(rec, src_dir, ctrl_images):
         im = load_image(image_dir, well, ch)
         templ_dict["Img_{}_Cpd".format(ch)] = img_tag(im, options='style="width: 250px;"')
         templ_dict["Img_{}_Ctrl".format(ch)] = ctrl_images[ch]
-        similar = sim_refs[sim_refs["Well_Id"] == well_id].sort_values("Similarity", ascending=False)
-    if len(similar) > 0:
-        ref_tbl = sim_ref_table(similar)
-        templ_dict["Ref_Table"] = ref_tbl
+    if rec["Activity"] < LIMIT_ACTIVITY_L:
+        templ_dict["Ref_Table"] = "Because of low activity, no similarity was determined."
+    elif rec["Rel_Cell_Count"] < LIMIT_CELL_COUNT_L:
+        templ_dict["Ref_Table"] = "Because of compound toxicity, no similarity was determined."
     else:
-        if rec["Activity"] < LIMIT_ACTIVITY_L:
-            templ_dict["Ref_Table"] = "Because of low activity, no similarity was determined."
-        elif rec["Rel_Cell_Count"] < LIMIT_CELL_COUNT_L:
-            templ_dict["Ref_Table"] = "Because of compound toxicity, no similarity was determined."
+        similar = (sim_refs[sim_refs["Well_Id"] == well_id]
+                   .sort_values("Similarity", ascending=False)
+                   .reset_index())
+        if len(similar) > 0:
+            ref_tbl = sim_ref_table(similar)
+            templ_dict["Ref_Table"] = ref_tbl
         else:
             templ_dict["Ref_Table"] = "No similar references found."
 
