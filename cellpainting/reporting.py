@@ -495,7 +495,7 @@ def detailed_report(rec, src_dir, ctrl_images):
         templ_dict["Img_{}_Cpd".format(ch)] = img_tag(im, options='style="width: 250px;"')
         templ_dict["Img_{}_Ctrl".format(ch)] = ctrl_images[ch]
     if rec["Activity"] < LIMIT_ACTIVITY_L:
-        templ_dict["Ref_Table"] = "Because of low activity, no similarity was determined."
+        templ_dict["Ref_Table"] = "Because of low induction (&lt; {}%), no similarity was determined.".format(LIMIT_ACTIVITY_L)
     elif rec["Rel_Cell_Count"] < LIMIT_CELL_COUNT_L:
         templ_dict["Ref_Table"] = "Because of compound toxicity, no similarity was determined."
     else:

@@ -794,7 +794,7 @@ REF_TABLE_ROW = """
     <td><a href="../../references/details/$link.html" ppLO="wpNT">$mol_img</a></td>
     <td>$Well_Id</td>
     <td title="Conc [&micro;M]">${Conc_uM}</td>
-    <td title="Induction [%]>$Activity</td>
+    <td title="Induction [%]">$Activity</td>
     <td title="Activity Profile similarity to the compound shown on top.">$Sim_Format</td>
     <td title="Chemical Tanimoto similarity to the compound shown on top.">$Tan_Format</td>
     <td title="The number of times this reference has been found similar by RESEARCH compounds.">$Times_Found</td>
