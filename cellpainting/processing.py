@@ -43,18 +43,13 @@ except ImportError:
     print("{:45s} ({})".format(__name__, time.strftime("%y%m%d-%H:%M", time.localtime(op.getmtime(__file__)))))
 
 try:
-    from . import resource_paths
+    from . import resource_paths as cprp
 except ImportError:
-    print("""# Resource Paths not found. You need to create a file `resource_paths.py` in the project dir. Use the provided `resource_paths_templ.py` as a template for the file.
-      It has to contain the locations of
-        - smiles_path: gzipped tab-delim. file with structure Smiles and Compound_Id.
-        - data_path: gzipped tab-delim. file with data Container_Id and
-                     container based data like purity (Pure_Flag).
-        - annotations_path: tab-delim. file with annotations to the references.
-        - references_path: tab-delim. file to the references to compare against.
-        - sim_refs_path: pickle file containing the similar references to every compound.
-        - layouts_path: tab-delim. file containing all plate layouts.
-    """)
+    from . import resource_paths_templ as cprp
+    print("* Resource paths not found, stub loaded.")
+    print("  Automatic loading of resources will not work,")
+    print("  please have a look at resource_paths_templ.py")
+
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
                     "Compound_Id", 'Container_Id', "Well_Id", "Producer", "Pure_Flag", "Toxic",
@@ -328,6 +323,13 @@ class DataSet():
         return result
 
 
+    def join_container(self, cont_data=None, how="inner"):
+        result = DataSet(log=self.log)
+        result.data = join_container(self.data, cont_data=cont_data, how=how)
+        result.print_log("join container")
+        return result
+
+
     def join_smiles(self, df_smiles=None, how="left"):
         """Join Smiles from Compound_Id."""
         result = DataSet()
@@ -528,7 +530,7 @@ def print_log(df, component, add_info=""):
 
 
 def read_smiles_file(fn, props=['Compound_Id', "Smiles"]):
-    """Read in the file with the Compound_Ids and the Simles.
+    """Read in the file with the Compound_Ids and the Smiles.
     Return a DataFrame for fast access."""
     result = pd.read_csv(fn, sep="\t")
     result = result[props]
@@ -570,6 +572,8 @@ def clear_resources():
 
 
 def load_resource(resource, mode="cpd"):
+    """Available resources: SMILES, ANNOTATIONS, SIM_REFS, REFERENCES,
+                            CONTAINER, CONTAINER_DATA, BATCH_DATA, DATASTORE, LAYOUTS"""
     res = resource.lower()
     glbls = globals()
     if "smi" in res:
@@ -577,23 +581,23 @@ def load_resource(resource, mode="cpd"):
             # except NameError:
             global SMILES
             print("- loading resource:                        (SMILES)")
-            SMILES = read_smiles_file(resource_paths.smiles_path,
-                                      props=resource_paths.smiles_cols)
+            SMILES = read_smiles_file(cprp.smiles_path,
+                                      props=cprp.smiles_cols)
             SMILES = SMILES.apply(pd.to_numeric, errors='ignore')
     elif "annot" in res:
         if "ANNOTATIONS" not in glbls:
             global ANNOTATIONS
             print("- loading resource:                        (ANNOTATIONS)")
-            ANNOTATIONS = pd.read_csv(resource_paths.annotations_path, sep="\t")
+            ANNOTATIONS = pd.read_csv(cprp.annotations_path, sep="\t")
             ANNOTATIONS = ANNOTATIONS.apply(pd.to_numeric, errors='ignore')
     elif "sim" in res:
         if "SIM_REFS" not in glbls:
             global SIM_REFS
             print("- loading resource:                        (SIM_REFS)")
             if "ext" in mode.lower():
-                srp = resource_paths.sim_refs_ext_path
+                srp = cprp.sim_refs_ext_path
             else:
-                srp = resource_paths.sim_refs_path
+                srp = cprp.sim_refs_path
             try:
                 SIM_REFS = pd.read_csv(srp, sep="\t")
             except FileNotFoundError:
@@ -603,37 +607,45 @@ def load_resource(resource, mode="cpd"):
         if "REFERENCES" not in glbls:
             global REFERENCES
             print("- loading resource:                        (REFERENCES)")
-            REFERENCES = pd.read_csv(resource_paths.references_path, sep="\t")  # .fillna("")
-    elif "data" in res:
-        if "DATASTORE" not in glbls:
-            global DATASTORE
-            print("- loading resource:                        (DATASTORE)")
-            try:
-                DATASTORE = pd.read_csv(resource_paths.datastore_path, sep="\t")
-            except FileNotFoundError:
-                print("  * DATASTORE not found, creating new one.")
-                DATASTORE = pd.DataFrame()
+            REFERENCES = pd.read_csv(cprp.references_path, sep="\t")  # .fillna("")
     elif "cont" in res:
         if "CONTAINER" not in glbls:
             global CONTAINER
             print("- loading resource:                        (CONTAINER)")
-            CONTAINER = pd.read_csv(resource_paths.container_data_path, sep="\t")
-            if len(resource_paths.container_data_cols) > 0:
-                CONTAINER = CONTAINER[resource_paths.container_data_cols]
+            CONTAINER = pd.read_csv(cprp.container_path, sep="\t")
+            if len(cprp.container_data_cols) > 0:
+                CONTAINER = CONTAINER[cprp.container_cols]
             CONTAINER = CONTAINER.apply(pd.to_numeric, errors='ignore')
-    elif "batch" in res:
-        if "BATCH" not in glbls:
-            global BATCH
-            print("- loading resource:                        (BATCH)")
-            BATCH = pd.read_csv(resource_paths.batch_data_path, sep="\t")
-            if len(resource_paths.batch_data_cols) > 0:
-                BATCH = BATCH[resource_paths.batch_data_cols]
-            BATCH = BATCH.apply(pd.to_numeric, errors='ignore')
+    elif "container_d" in res:
+        if "CONTAINER_DATA" not in glbls:
+            global CONTAINER_DATA
+            print("- loading resource:                        (CONTAINER)")
+            CONTAINER_DATA = pd.read_csv(cprp.container_data_path, sep="\t")
+            if len(cprp.container_data_cols) > 0:
+                CONTAINER_DATA = CONTAINER_DATA[cprp.container_data_cols]
+            CONTAINER_DATA = CONTAINER_DATA.apply(pd.to_numeric, errors='ignore')
+    elif "batch_d" in res:
+        if "BATCH_DATA" not in glbls:
+            global BATCH_DATA
+            print("- loading resource:                        (BATCH_DATA)")
+            BATCH_DATA = pd.read_csv(cprp.batch_data_path, sep="\t")
+            if len(cprp.batch_data_cols) > 0:
+                BATCH_DATA = BATCH_DATA[cprp.batch_data_cols]
+            BATCH_DATA = BATCH_DATA.apply(pd.to_numeric, errors='ignore')
+    elif "datast" in res:
+        if "DATASTORE" not in glbls:
+            global DATASTORE
+            print("- loading resource:                        (DATASTORE)")
+            try:
+                DATASTORE = pd.read_csv(cprp.datastore_path, sep="\t")
+            except FileNotFoundError:
+                print("  * DATASTORE not found, creating new one.")
+                DATASTORE = pd.DataFrame()
     elif "layout" in res:
         if "LAYOUTS" not in glbls:
             global LAYOUTS
             print("- loading resource:                        (LAYOUTS)")
-            LAYOUTS = pd.read_csv(resource_paths.layouts_path, sep="\t")
+            LAYOUTS = pd.read_csv(cprp.layouts_path, sep="\t")
     else:
         raise FileNotFoundError("# unknown resource: {}".format(resource))
 
@@ -709,7 +721,6 @@ def join_layout_1536(df, plate, quadrant, on="Address_384", sep="\t", how="inner
     """Cell Painting is always run in 384er plates.
     COMAS standard screening plates are format 1536.
     With this function, the 1536-to-384 reformatting file
-    with the smiles added by join_smiles_to_layout_1536()
     can be used directly to join the layout to the individual 384er plates."""
     load_resource("LAYOUTS")
     layout = LAYOUTS.copy()
@@ -722,7 +733,7 @@ def join_layout_1536(df, plate, quadrant, on="Address_384", sep="\t", how="inner
         layout.rename(columns={"Container_ID_1536": "Container_Id"}, inplace=True)
     if "Conc" in layout.keys():
         layout.rename(columns={"Conc": "Conc_uM"}, inplace=True)
-    layout = get_cpd_from_container(layout)
+    layout = join_container(layout)
     drop_cols(layout, drop, inplace=True)
     result[on] = plate + "." + quadrant[-1:] + result["Metadata_Well"]
     result = result.merge(layout, on=on, how=how)
@@ -733,9 +744,9 @@ def join_layout_1536(df, plate, quadrant, on="Address_384", sep="\t", how="inner
 
 
 def write_datastore():
-    df = DATASTORE[resource_paths.datastore_cols]
+    df = DATASTORE[cprp.datastore_cols]
     df = df.sort_values("Well_Id")
-    df.to_csv(resource_paths.datastore_path, index=False, sep="\t")
+    df.to_csv(cprp.datastore_path, index=False, sep="\t")
     print_log(df, "write datastore")
 
 
@@ -748,7 +759,7 @@ def update_datastore(df2, on="Well_Id", mode="cpd", write=False):
         df2["Is_Ref"] = True
     else:
         df2["Is_Ref"] = False
-    df2 = df2[resource_paths.datastore_cols]
+    df2 = df2[cprp.datastore_cols]
     df1 = df1.append(df2, ignore_index=True)
     rem = "" if write else "write is off"
     print_log(df2, "update datastore", rem)
@@ -760,8 +771,8 @@ def update_datastore(df2, on="Well_Id", mode="cpd", write=False):
 def join_batch_data(df, df_data=None, how="Left", fillna="n.d."):
     """Join data from Batch_Id."""
     if df_data is None:
-        load_resource("BATCH")
-        df_data = BATCH
+        load_resource("BATCH_DATA")
+        df_data = BATCH_DATA
     if "Batch_Id" not in df.keys():
         df = get_batch_from_container(df)
     result = df.merge(df_data, on="Batch_Id", how=how)
@@ -773,11 +784,19 @@ def join_batch_data(df, df_data=None, how="Left", fillna="n.d."):
 def join_container_data(df, df_data=None, how="Left", fillna=""):
     """Join data from Container_Id."""
     if df_data is None:
-        load_resource("CONTAINER")
-        df_data = CONTAINER
+        load_resource("CONTAINER_DATA")
+        df_data = CONTAINER_DATA
     result = df.merge(df_data, on="Container_Id", how=how)
     result = result.apply(pd.to_numeric, errors='ignore')
     result = result.fillna(fillna)
+    return result
+
+
+def join_container(df, cont_data=None, how="inner"):
+    if cont_data is None:
+        load_resource("CONTAINER")
+        cont_data = CONTAINER[["Container_Id", "Compound_Id"]]
+    result = df.merge(cont_data, on="Container_Id", how=how)
     return result
 
 
@@ -1227,9 +1246,9 @@ def write_sim_refs(mode="cpd"):
     keep = ["Compound_Id", "Well_Id", "Is_Ref", "Ref_Id", "RefCpd_Id",
             "Similarity", "Tanimoto", "Times_Found"]
     if "ext" in mode.lower():
-        sim_fn = resource_paths.sim_refs_ext_path
+        sim_fn = cprp.sim_refs_ext_path
     else:
-        sim_fn = resource_paths.sim_refs_path
+        sim_fn = cprp.sim_refs_path
     sim_fn_pp = op.splitext(sim_fn)[0] + "_pp.tsv"
     SIM_REFS = SIM_REFS[keep]
     sim_refs = SIM_REFS

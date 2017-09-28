@@ -64,7 +64,7 @@ def aggregate(input_dir, agg_type="median", sep="\t"):
 if __name__ == "__main__":
     # file_to_search file_w_smiles output_dir job_index
     parser = argparse.ArgumentParser(
-        descripiton="Aggregate CellProfiler Results by Mean or Median.\nWrites out a Results.tsv file.")
+        description="Aggregate CellProfiler Results by Mean or Median.\nWrites out a Results.tsv file.")
     parser.add_argument("input_dir", help="The directory with the CellProfiler results.")
     parser.add_argument("-s", "--sep", help="column separator (default is tab).")
     parser.add_argument("-t", "--type", help="aggregation type, mean or median.",

@@ -26,7 +26,15 @@ import matplotlib.pyplot as plt
 from . import tools as cpt
 from . import report_templ as cprt
 from . import processing as cpp
-from . import resource_paths as cprp
+
+try:
+    from . import resource_paths as cprp
+except ImportError:
+    from . import resource_paths_templ as cprp
+    print("* Resource paths not found, stub loaded.")
+    print("  Automatic loading of resources will not work,")
+    print("  please have a look at resource_paths_templ.py")
+
 from .config import (ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC, ACT_CUTOFF_PERC_REF,
                      LIMIT_ACTIVITY_H, LIMIT_ACTIVITY_L,
                      LIMIT_CELL_COUNT_H, LIMIT_CELL_COUNT_L,
