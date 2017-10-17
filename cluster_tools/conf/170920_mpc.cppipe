@@ -1,0 +1,468 @@
+CellProfiler Pipeline: http://www.cellprofiler.org
+Version:3
+DateRevision:300
+GitHash:
+ModuleCount:19
+HasImagePlaneDetails:False
+
+LoadImages:[module_num:1|svn_version:\'Unknown\'|variable_revision_number:11|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    File type to be loaded:individual images
+    File selection method:Text-Exact match
+    Number of images in each group?:3
+    Type the text that the excluded images have in common:_thumb
+    Analyze all subfolders within the selected folder?:All
+    Input image file location:Default Input Folder\x7Cplate
+    Check image sets for unmatched or duplicate files?:Yes
+    Group images by metadata?:No
+    Exclude certain files?:Yes
+    Specify metadata fields to group by:
+    Select subfolders to analyze:
+    Image count:5
+    Text that these images have in common (case-sensitive):w5
+    Position of this image in each group:1
+    Extract metadata from where?:File name
+    Regular expression that finds metadata in the file name:^(?P<Plate>.*)_(?P<Well>\x5BA-P\x5D\x5B0-9\x5D{2})_s(?P<Site>\x5B0-9\x5D)
+    Type the regular expression that finds metadata in the subfolder path:.*\x5B\\\\\\\\/\x5D(?P<Date>.*)\x5B\\\\\\\\/\x5D(?P<Run>.*)$
+    Channel count:1
+    Group the movie frames?:No
+    Grouping method:Interleaved
+    Number of channels per group:3
+    Load the input as images or objects?:Images
+    Name this loaded image:illumHoechst
+    Name this loaded object:Nuclei
+    Retain outlines of loaded objects?:No
+    Name the outline image:LoadedImageOutlines
+    Channel number:5
+    Rescale intensities?:Yes
+    Text that these images have in common (case-sensitive):w4
+    Position of this image in each group:2
+    Extract metadata from where?:File name
+    Regular expression that finds metadata in the file name:^(?P<Plate>.*)_(?P<Well>\x5BA-P\x5D\x5B0-9\x5D{2})_s(?P<Site>\x5B0-9\x5D)
+    Type the regular expression that finds metadata in the subfolder path:.*\x5B\\\\\\\\/\x5D(?P<Date>.*)\x5B\\\\\\\\/\x5D(?P<Run>.*)$
+    Channel count:1
+    Group the movie frames?:No
+    Grouping method:Interleaved
+    Number of channels per group:3
+    Load the input as images or objects?:Images
+    Name this loaded image:illumER
+    Name this loaded object:Nuclei
+    Retain outlines of loaded objects?:No
+    Name the outline image:LoadedImageOutlines
+    Channel number:4
+    Rescale intensities?:Yes
+    Text that these images have in common (case-sensitive):w3
+    Position of this image in each group:3
+    Extract metadata from where?:File name
+    Regular expression that finds metadata in the file name:^(?P<Plate>.*)_(?P<Well>\x5BA-P\x5D\x5B0-9\x5D{2})_s(?P<Site>\x5B0-9\x5D)
+    Type the regular expression that finds metadata in the subfolder path:.*\x5B\\\\\\\\/\x5D(?P<Date>.*)\x5B\\\\\\\\/\x5D(?P<Run>.*)$
+    Channel count:1
+    Group the movie frames?:No
+    Grouping method:Interleaved
+    Number of channels per group:3
+    Load the input as images or objects?:Images
+    Name this loaded image:illumSyto
+    Name this loaded object:Nuclei
+    Retain outlines of loaded objects?:No
+    Name the outline image:LoadedImageOutlines
+    Channel number:7
+    Rescale intensities?:Yes
+    Text that these images have in common (case-sensitive):w2
+    Position of this image in each group:4
+    Extract metadata from where?:File name
+    Regular expression that finds metadata in the file name:^(?P<Plate>.*)_(?P<Well>\x5BA-P\x5D\x5B0-9\x5D{2})_s(?P<Site>\x5B0-9\x5D)
+    Type the regular expression that finds metadata in the subfolder path:.*\x5B\\\\\\\\/\x5D(?P<Date>.*)\x5B\\\\\\\\/\x5D(?P<Run>.*)$
+    Channel count:1
+    Group the movie frames?:No
+    Grouping method:Interleaved
+    Number of channels per group:3
+    Load the input as images or objects?:Images
+    Name this loaded image:illumPH_Golgi
+    Name this loaded object:Nuclei
+    Retain outlines of loaded objects?:No
+    Name the outline image:LoadedImageOutlines
+    Channel number:3
+    Rescale intensities?:Yes
+    Text that these images have in common (case-sensitive):w1
+    Position of this image in each group:5
+    Extract metadata from where?:File name
+    Regular expression that finds metadata in the file name:^(?P<Plate>.*)_(?P<Well>\x5BA-P\x5D\x5B0-9\x5D{2})_s(?P<Site>\x5B0-9\x5D)
+    Type the regular expression that finds metadata in the subfolder path:.*\x5B\\\\\\\\/\x5D(?P<Date>.*)\x5B\\\\\\\\/\x5D(?P<Run>.*)$
+    Channel count:1
+    Group the movie frames?:No
+    Grouping method:Interleaved
+    Number of channels per group:3
+    Load the input as images or objects?:Images
+    Name this loaded image:illumMito
+    Name this loaded object:Nuclei
+    Retain outlines of loaded objects?:No
+    Name the outline image:LoadedImageOutlines
+    Channel number:1
+    Rescale intensities?:Yes
+
+LoadSingleImage:[module_num:2|svn_version:\'Unknown\'|variable_revision_number:5|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Input image file location:Elsewhere...\x7C/ptmp/allg/apahl/cp/correction
+    Filename of the image to load (Include the extension, e.g., .tif):illumHoechstcorrect.mat
+    Load as images or objects?:Images
+    Name the image that will be loaded:IllumHoechstcorrect
+    Name this loaded object:Nuclei
+    Retain outlines of loaded objects?:No
+    Name the outlines:NucleiOutlines
+    Rescale intensities?:Yes
+    Filename of the image to load (Include the extension, e.g., .tif):illumERcorrect.mat
+    Load as images or objects?:Images
+    Name the image that will be loaded:IllumERcorrect
+    Name this loaded object:Nuclei
+    Retain outlines of loaded objects?:No
+    Name the outlines:NucleiOutlines
+    Rescale intensities?:Yes
+    Filename of the image to load (Include the extension, e.g., .tif):illumSytocorrect.mat
+    Load as images or objects?:Images
+    Name the image that will be loaded:IllumSytocorrect
+    Name this loaded object:Nuclei
+    Retain outlines of loaded objects?:No
+    Name the outlines:NucleiOutlines
+    Rescale intensities?:Yes
+    Filename of the image to load (Include the extension, e.g., .tif):illumPh_golgicorrect.mat
+    Load as images or objects?:Images
+    Name the image that will be loaded:IllumPhgolgicorrect
+    Name this loaded object:Nuclei
+    Retain outlines of loaded objects?:No
+    Name the outlines:NucleiOutlines
+    Rescale intensities?:Yes
+    Filename of the image to load (Include the extension, e.g., .tif):illumMitocorrect.mat
+    Load as images or objects?:Images
+    Name the image that will be loaded:IllumMitocorrect
+    Name this loaded object:Nuclei
+    Retain outlines of loaded objects?:No
+    Name the outlines:NucleiOutlines
+    Rescale intensities?:Yes
+
+CorrectIlluminationApply:[module_num:3|svn_version:\'Unknown\'|variable_revision_number:3|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:illumHoechst
+    Name the output image:Hoechst
+    Select the illumination function:IllumHoechstcorrect
+    Select how the illumination function is applied:Divide
+    Select the input image:illumER
+    Name the output image:ER
+    Select the illumination function:IllumERcorrect
+    Select how the illumination function is applied:Divide
+    Select the input image:illumSyto
+    Name the output image:Syto
+    Select the illumination function:IllumSytocorrect
+    Select how the illumination function is applied:Divide
+    Select the input image:illumPH_Golgi
+    Name the output image:Ph_golgi
+    Select the illumination function:IllumPhgolgicorrect
+    Select how the illumination function is applied:Divide
+    Select the input image:illumMito
+    Name the output image:Mito
+    Select the illumination function:IllumMitocorrect
+    Select how the illumination function is applied:Divide
+
+MeasureImageQuality:[module_num:4|svn_version:\'Unknown\'|variable_revision_number:5|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Calculate metrics for which images?:Select...
+    Image count:1
+    Scale count:1
+    Threshold count:1
+    Select the images to measure:ER,Hoechst,Mito,Ph_golgi,Syto
+    Include the image rescaling value?:Yes
+    Calculate blur metrics?:Yes
+    Spatial scale for blur measurements:20
+    Calculate saturation metrics?:Yes
+    Calculate intensity metrics?:Yes
+    Calculate thresholds?:Yes
+    Use all thresholding methods?:No
+    Select a thresholding method:Otsu
+    Typical fraction of the image covered by objects:0.1
+    Two-class or three-class thresholding?:Two classes
+    Minimize the weighted variance or the entropy?:Weighted variance
+    Assign pixels in the middle intensity class to the foreground or the background?:Foreground
+
+IdentifyPrimaryObjects:[module_num:5|svn_version:\'Unknown\'|variable_revision_number:13|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Input:Hoechst
+    Object:Nuclei
+    Typical diameter of objects, in pixel units (Min,Max):10,60
+    Discard objects outside the diameter range?:Yes
+    Discard objects touching the border of the image?:Yes
+    Method to distinguish clumped objects:Shape
+    Method to draw dividing lines between clumped objects:Shape
+    Size of smoothing filter:10
+    Suppress local maxima that are closer than this minimum allowed distance:10
+    Speed up by using lower-resolution image to find local maxima?:Yes
+    Fill holes in identified objects?:Never
+    Automatically calculate size of smoothing filter for declumping?:No
+    Automatically calculate minimum allowed distance between local maxima?:No
+    Handling of objects if excessive number of objects identified:Erase
+    Maximum number of objects:700
+    Use advanced settings?:Yes
+    Threshold setting version:9
+    Threshold strategy:Global
+    Thresholding method:Otsu
+    Threshold smoothing scale:1.3488
+    Threshold correction factor:1.0
+    Lower and upper bounds on threshold:0.0125,1.000000
+    Manual threshold:0.0
+    Select the measurement to threshold with:None
+    Two-class or three-class thresholding?:Two classes
+    Assign pixels in the middle intensity class to the foreground or the background?:Foreground
+    Size of adaptive window:10
+    Lower outlier fraction:0.05
+    Upper outlier fraction:0.05
+    Averaging method:Mean
+    Variance method:Standard deviation
+    # of deviations:2
+    Thresholding method:Otsu
+
+IdentifySecondaryObjects:[module_num:6|svn_version:\'Unknown\'|variable_revision_number:9|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input objects:Nuclei
+    Name the objects to be identified:Cells
+    Select the method to identify the secondary objects:Watershed - Image
+    Select the input image:Ph_golgi
+    Number of pixels by which to expand the primary objects:10
+    Regularization factor:0.05
+    Name the outline image:CellOutlines
+    Retain outlines of the identified secondary objects?:No
+    Discard secondary objects touching the border of the image?:No
+    Discard the associated primary objects?:No
+    Name the new primary objects:FilteredNuclei
+    Retain outlines of the new primary objects?:No
+    Name the new primary object outlines:FilteredNucleiOutlines
+    Fill holes in identified objects?:Yes
+    Threshold setting version:9
+    Threshold strategy:Global
+    Thresholding method:Otsu
+    Threshold smoothing scale:0
+    Threshold correction factor:0.9
+    Lower and upper bounds on threshold:0.02,1.0
+    Manual threshold:0.0
+    Select the measurement to threshold with:None
+    Two-class or three-class thresholding?:Three classes
+    Assign pixels in the middle intensity class to the foreground or the background?:Foreground
+    Size of adaptive window:10
+    Lower outlier fraction:0.05
+    Upper outlier fraction:0.05
+    Averaging method:Mean
+    Variance method:Standard deviation
+    # of deviations:2
+    Thresholding method:Otsu
+
+IdentifyTertiaryObjects:[module_num:7|svn_version:\'Unknown\'|variable_revision_number:2|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Select the larger identified objects:Cells
+    Select the smaller identified objects:Nuclei
+    Name the tertiary objects to be identified:Cytoplasm
+    Name the outline image:CytoplasmOutlines
+    Retain outlines of the tertiary objects?:No
+    Shrink smaller object prior to subtraction?:Yes
+
+MeasureCorrelation:[module_num:8|svn_version:\'Unknown\'|variable_revision_number:3|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Hidden:5
+    Hidden:3
+    Select an image to measure:Hoechst
+    Select an image to measure:Mito
+    Select an image to measure:ER
+    Select an image to measure:Syto
+    Select an image to measure:Ph_golgi
+    Set threshold as percentage of maximum intensity for the images:15.0
+    Select where to measure correlation:Within objects
+    Select an object to measure:Nuclei
+    Select an object to measure:Cells
+    Select an object to measure:Cytoplasm
+
+MeasureGranularity:[module_num:9|svn_version:\'Unknown\'|variable_revision_number:3|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Image count:5
+    Object count:1
+    Select an image to measure:Hoechst
+    Subsampling factor for granularity measurements:0.25
+    Subsampling factor for background reduction:0.25
+    Radius of structuring element:10
+    Range of the granular spectrum:16
+    Select objects to measure:Nuclei
+    Object count:3
+    Select an image to measure:Mito
+    Subsampling factor for granularity measurements:0.25
+    Subsampling factor for background reduction:0.25
+    Radius of structuring element:10
+    Range of the granular spectrum:16
+    Select objects to measure:Cells
+    Select objects to measure:Nuclei
+    Select objects to measure:Cytoplasm
+    Object count:3
+    Select an image to measure:ER
+    Subsampling factor for granularity measurements:0.25
+    Subsampling factor for background reduction:0.25
+    Radius of structuring element:10
+    Range of the granular spectrum:16
+    Select objects to measure:Cells
+    Select objects to measure:Nuclei
+    Select objects to measure:Cytoplasm
+    Object count:3
+    Select an image to measure:Ph_golgi
+    Subsampling factor for granularity measurements:0.25
+    Subsampling factor for background reduction:0.25
+    Radius of structuring element:10
+    Range of the granular spectrum:16
+    Select objects to measure:Cells
+    Select objects to measure:Cytoplasm
+    Select objects to measure:Nuclei
+    Object count:3
+    Select an image to measure:Syto
+    Subsampling factor for granularity measurements:0.25
+    Subsampling factor for background reduction:0.25
+    Radius of structuring element:10
+    Range of the granular spectrum:16
+    Select objects to measure:Cells
+    Select objects to measure:Cytoplasm
+    Select objects to measure:Nuclei
+
+MeasureObjectIntensity:[module_num:10|svn_version:\'Unknown\'|variable_revision_number:3|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Hidden:5
+    Select an image to measure:Hoechst
+    Select an image to measure:ER
+    Select an image to measure:Syto
+    Select an image to measure:Ph_golgi
+    Select an image to measure:Mito
+    Select objects to measure:Nuclei
+    Select objects to measure:Cells
+    Select objects to measure:Cytoplasm
+
+MeasureObjectNeighbors:[module_num:11|svn_version:\'Unknown\'|variable_revision_number:2|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Select objects to measure:Nuclei
+    Select neighboring objects to measure:Nuclei
+    Method to determine neighbors:Within a specified distance
+    Neighbor distance:2
+    Retain the image of objects colored by numbers of neighbors?:No
+    Name the output image:ObjectNeighborCount
+    Select colormap:Default
+    Retain the image of objects colored by percent of touching pixels?:No
+    Name the output image:PercentTouching
+    Select a colormap:Default
+
+MeasureObjectNeighbors:[module_num:12|svn_version:\'Unknown\'|variable_revision_number:2|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Select objects to measure:Cells
+    Select neighboring objects to measure:Cells
+    Method to determine neighbors:Within a specified distance
+    Neighbor distance:5
+    Retain the image of objects colored by numbers of neighbors?:No
+    Name the output image:ObjectNeighborCount
+    Select colormap:Default
+    Retain the image of objects colored by percent of touching pixels?:No
+    Name the output image:PercentTouching
+    Select a colormap:Default
+
+MeasureObjectNeighbors:[module_num:13|svn_version:\'Unknown\'|variable_revision_number:2|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Select objects to measure:Cells
+    Select neighboring objects to measure:Cells
+    Method to determine neighbors:Adjacent
+    Neighbor distance:5
+    Retain the image of objects colored by numbers of neighbors?:No
+    Name the output image:ObjectNeighborCount
+    Select colormap:Default
+    Retain the image of objects colored by percent of touching pixels?:No
+    Name the output image:PercentTouching
+    Select a colormap:Default
+
+MeasureObjectIntensityDistribution:[module_num:14|svn_version:\'Unknown\'|variable_revision_number:5|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Hidden:4
+    Hidden:3
+    Hidden:1
+    Hidden:0
+    Calculate intensity Zernikes?:None
+    Maximum zernike moment:9
+    Select an image to measure:ER
+    Select an image to measure:Syto
+    Select an image to measure:Ph_golgi
+    Select an image to measure:Mito
+    Select objects to measure:Cells
+    Object to use as center?:These objects
+    Select objects to use as centers:These objects
+    Select objects to measure:Nuclei
+    Object to use as center?:These objects
+    Select objects to use as centers:None
+    Select objects to measure:Cytoplasm
+    Object to use as center?:These objects
+    Select objects to use as centers:None
+    Scale the bins?:Yes
+    Number of bins:4
+    Maximum radius:
+
+MeasureObjectSizeShape:[module_num:15|svn_version:\'Unknown\'|variable_revision_number:1|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Select objects to measure:Cells
+    Select objects to measure:Nuclei
+    Select objects to measure:Cytoplasm
+    Calculate the Zernike features?:Yes
+
+MeasureTexture:[module_num:16|svn_version:\'Unknown\'|variable_revision_number:4|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Hidden:5
+    Hidden:3
+    Hidden:3
+    Select an image to measure:Hoechst
+    Select an image to measure:ER
+    Select an image to measure:Syto
+    Select an image to measure:Ph_golgi
+    Select an image to measure:Mito
+    Select objects to measure:Cells
+    Select objects to measure:Cytoplasm
+    Select objects to measure:Nuclei
+    Texture scale to measure:3
+    Angles to measure:Horizontal,Vertical
+    Texture scale to measure:5
+    Angles to measure:Horizontal,Vertical
+    Texture scale to measure:10
+    Angles to measure:Horizontal,Vertical
+    Measure Gabor features?:Yes
+    Number of angles to compute for Gabor:4
+    Measure images or objects?:Both
+
+OverlayOutlines:[module_num:17|svn_version:\'Unknown\'|variable_revision_number:4|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Display outlines on a blank image?:Yes
+    Select image on which to display outlines:None
+    Name the output image:CellOutlines
+    Outline display mode:Color
+    Select method to determine brightness of outlines:Max of image
+    How to outline:Inner
+    Select outline color:#E5E5E5
+    Select objects to display:Cells
+    Select outline color:white
+    Select objects to display:Nuclei
+
+SaveImages:[module_num:18|svn_version:\'Unknown\'|variable_revision_number:12|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Select the type of image to save:Image
+    Select the image to save:CellOutlines
+    Select method for constructing file names:Single name
+    Select image name for file prefix:None
+    Enter single file name:Outline_\\\\g<Plate>_\\\\g<Well>_\\\\g<Site>
+    Number of digits:4
+    Append a suffix to the image file name?:No
+    Text to append to the image name:Do not use
+    Saved file format:png
+    Output file location:Default Output Folder sub-folder\x7Coutlines
+    Image bit depth:8-bit integer
+    Overwrite existing files without warning?:Yes
+    When to save:Every cycle
+    Record the file and path information to the saved image?:Yes
+    Create subfolders in the output folder?:No
+    Base image folder:Default Input Folder
+
+ExportToSpreadsheet:[module_num:19|svn_version:\'Unknown\'|variable_revision_number:11|show_window:False|notes:\x5B\x5D|batch_state:array(\x5B\x5D, dtype=uint8)|enabled:True|wants_pause:False]
+    Select the column delimiter:Tab
+    Add image metadata columns to your object data file?:No
+    Limit output to a size that is allowed in Excel?:No
+    Select the measurements to export:No
+    Calculate the per-image mean values for object measurements?:No
+    Calculate the per-image median values for object measurements?:No
+    Calculate the per-image standard deviation values for object measurements?:No
+    Output file location:Default Output Folder\x7Cfolder
+    Create a GenePattern GCT file?:No
+    Select source of sample row name:Metadata
+    Select the image to use as the identifier:None
+    Select the metadata to use as the identifier:None
+    Export all measurement types?:Yes
+    :
+    Representation of Nan/Inf:NaN
+    Add a prefix to file names?:No
+    Filename prefix:
+    Overwrite existing files without warning?:Yes
+    Data to export:Image
+    Combine these object measurements with those of the previous object?:No
+    File name:DATA.txt
+    Use the object name for the file name?:Yes
