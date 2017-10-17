@@ -354,6 +354,7 @@ def sim_ref_table(similar):
         ref_id = rec["Ref_Id"]
         ref_data = df_refs[df_refs["Well_Id"] == ref_id]
         if len(ref_data) == 0:
+            print(rec)
             raise ValueError("BUG: ref_data should not be empty.")
         ref_data = ref_data.copy()
         ref_data = ref_data.fillna("&mdash;")
