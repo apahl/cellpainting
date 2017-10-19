@@ -87,18 +87,41 @@ class DataSet():
         return result
 
 
+    # def __getattr__(self, name):
+    #     """Try to call undefined methods on the underlying pandas DataFrame."""
+    #     def method(*args, **kwargs):
+    #         res = getattr(self.data, name)(*args, **kwargs)
+    #         if isinstance(res, pd.DataFrame):
+    #             result = DataSet()
+    #             result.data = res
+    #             result.print_log(name)
+    #         else:
+    #             result = res
+    #         return result
+    #     return method
+
+
     def __getattr__(self, name):
         """Try to call undefined methods on the underlying pandas DataFrame."""
-        def method(*args, **kwargs):
-            res = getattr(self.data, name)(*args, **kwargs)
-            if isinstance(res, pd.DataFrame):
-                result = DataSet()
-                result.data = res
-                result.print_log(name)
-            else:
-                result = res
-            return result
-        return method
+        if hasattr(self.data, name):
+            def method(*args, **kwargs):
+                res = getattr(self.data, name)(*args, **kwargs)
+                if isinstance(res, pd.DataFrame):
+                    result = self.new()
+                    result.data = res
+                    print_log(result.data, name)
+                else:
+                    result = res
+                return result
+            return method
+        else:
+            raise AttributeError
+
+
+    def new(self):
+        result = DataSet()
+        # self._pass_properties(result)
+        return result
 
 
     def show(self):
