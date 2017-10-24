@@ -843,7 +843,9 @@ DEC_PARM_TABLE_HEADER = """
 PARM_TABLE_ROW = """
 <tr>
     <td>$idx</td>
-    <td class="left">$Parameter</td>
+    <td class="left" title="click to open the CellProfiler Parameter help.">
+      <a href=http://cellprofiler.org/manuals/current/${Help_Page}.html ppLO="wpNT">$Parameter</a>
+    </td>
 </tr>"""
 
 DETAILS_REF_ROW = """

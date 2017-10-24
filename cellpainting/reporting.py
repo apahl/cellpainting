@@ -38,7 +38,8 @@ except ImportError:
 from .config import (ACT_PROF_PARAMETERS, ACT_CUTOFF_PERC, ACT_CUTOFF_PERC_REF,
                      LIMIT_ACTIVITY_H, LIMIT_ACTIVITY_L,
                      LIMIT_CELL_COUNT_H, LIMIT_CELL_COUNT_L,
-                     LIMIT_SIMILARITY_H, LIMIT_SIMILARITY_L)
+                     LIMIT_SIMILARITY_H, LIMIT_SIMILARITY_L,
+                     PARAMETER_HELP)
 
 Draw.DrawingOptions.atomLabelFontFace = "DejaVu Sans"
 Draw.DrawingOptions.atomLabelFontSize = 18
@@ -380,9 +381,13 @@ def changed_parameters_table(act_prof, val, parameters=ACT_PROF_PARAMETERS):
     table = []
     templ = Template(cprt.PARM_TABLE_ROW)
     for idx, p in enumerate(changed, 1):
+        p_elmnts = p.split("_")
+        p_module = p_elmnts[2]
+        p_name = "_".join(p_elmnts[1:])
         rec = {
             "idx": idx,
-            "Parameter": p[7:]
+            "Parameter": p_name,
+            "Help_Page": PARAMETER_HELP[p_module]
         }
         row = templ.substitute(rec)
         table.append(row)
@@ -469,6 +474,8 @@ def show_images(plate_quad, well):
 
 
 def detailed_report(rec, src_dir, ctrl_images):
+    print(rec)
+    sys.exit(0)
     cpp.load_resource("SIM_REFS")
     sim_refs = cpp.SIM_REFS
     date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
@@ -488,7 +495,7 @@ def detailed_report(rec, src_dir, ctrl_images):
     templ_dict["mol_img"] = mol_img_tag(mol, options='class="cpd_image"')
     templ_dict["Inc_Parm_Table"] = inc_parm
     templ_dict["Dec_Parm_Table"] = dec_parm
-    templ_dict["parm_hist"] = parm_hist(increased, decreased)
+    templ_dict["parm_hist"] = parm_hist(increased, decreased, cache_name)
     if "Known_Act" in templ_dict:
         if templ_dict["Trivial_Name"] == np.nan or templ_dict["Trivial_Name"] == "":
             templ_dict["Trivial_Name"] = "&mdash;"

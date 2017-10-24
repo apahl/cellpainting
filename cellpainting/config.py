@@ -323,6 +323,15 @@ ACT_PROF_PARAMETERS = [
     "Median_Nuclei_Texture_Variance_Syto_5_90"
 ]
 
+PARAMETER_HELP = {
+    "AreaShape": "MeasureObjectSizeShape",
+    "Correlation": "MeasureCorrelation",
+    "Granularity": "MeasureGranularity",
+    "Intensity": "MeasureObjectIntensity",
+    "Neighbors": "MeasureObjectNeighbors",
+    "RadialDistribution": "MeasureObjectRadialDistribution",
+    "Texture": "MeasureTexture"
+}
 
 # ACT_CUTOFF = int(0.033 * len(ACT_PROF_PARAMETERS))
 ACT_CUTOFF_PERC = 0.5
