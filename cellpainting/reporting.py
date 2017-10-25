@@ -11,6 +11,7 @@ Tools for creating HTML Reports."""
 
 import time
 import base64
+import os
 import os.path as op
 from string import Template
 from io import BytesIO as IO
@@ -403,7 +404,12 @@ def parm_stats(parameters):
     return result
 
 
-def parm_hist(increased, decreased):
+def parm_hist(increased, decreased, hist_cache):
+    # try to load histogram from cache:
+    if op.isfile(hist_cache):
+        result = open(hist_cache).read()
+        return result
+
     labels = [
         "Mito",
         "Golgi / Membrane",
@@ -454,6 +460,7 @@ def parm_hist(increased, decreased):
     img_file.close()
     # important, otherwise the plots will accumulate and fill up memory:
     plt.close()
+    open(hist_cache, "w").write(result)  # cache the histogram
     return result
 
 
@@ -474,8 +481,7 @@ def show_images(plate_quad, well):
 
 
 def detailed_report(rec, src_dir, ctrl_images):
-    print(rec)
-    sys.exit(0)
+    # print(rec)
     cpp.load_resource("SIM_REFS")
     sim_refs = cpp.SIM_REFS
     date = time.strftime("%d-%m-%Y %H:%M", time.localtime())
@@ -491,11 +497,15 @@ def detailed_report(rec, src_dir, ctrl_images):
         rec["Pure_Flag"] = "n.d."
 
     templ_dict = rec.copy()
+    cache_path = op.join("hist", rec["Plate"])
+    os.makedirs(cache_path, exist_ok=True)
+    hc_fn = sanitize_filename(rec["Well_Id"] + ".txt")
+    hist_cache = op.join(cache_path, hc_fn)
     templ_dict["Date"] = date
     templ_dict["mol_img"] = mol_img_tag(mol, options='class="cpd_image"')
     templ_dict["Inc_Parm_Table"] = inc_parm
     templ_dict["Dec_Parm_Table"] = dec_parm
-    templ_dict["parm_hist"] = parm_hist(increased, decreased, cache_name)
+    templ_dict["parm_hist"] = parm_hist(increased, decreased, hist_cache)
     if "Known_Act" in templ_dict:
         if templ_dict["Trivial_Name"] == np.nan or templ_dict["Trivial_Name"] == "":
             templ_dict["Trivial_Name"] = "&mdash;"
