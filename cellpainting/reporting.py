@@ -497,7 +497,7 @@ def detailed_report(rec, src_dir, ctrl_images):
         rec["Pure_Flag"] = "n.d."
 
     templ_dict = rec.copy()
-    cache_path = op.join("hist", rec["Plate"])
+    cache_path = op.join("histograms", rec["Plate"])
     os.makedirs(cache_path, exist_ok=True)
     hc_fn = sanitize_filename(rec["Well_Id"] + ".txt")
     hist_cache = op.join(cache_path, hc_fn)
