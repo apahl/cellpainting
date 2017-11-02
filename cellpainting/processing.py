@@ -1109,7 +1109,7 @@ def correlation_filter(df, cutoff=0.9, method="pearson"):
 
     iteration = 0
     while True:
-        cm = df_copy.corr(method=method)
+        cm = df_copy.corr(method=method).abs()
         correlated = cm[cm > cutoff]
         ds = correlated.count().sort_values(ascending=False)
         if ds[0] == 1: break  # no more correlations
