@@ -21,6 +21,8 @@ import pickle
 import pandas as pd
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 from rdkit.Chem import AllChem as Chem
 from rdkit import DataStructs
 
@@ -50,6 +52,15 @@ except ImportError:
     print("  Automatic loading of resources will not work,")
     print("  please have a look at resource_paths_templ.py")
 
+
+try:
+    import holoviews as hv
+    hv.extension("bokeh")
+    HOLOVIEWS = True
+
+except ImportError:
+    HOLOVIEWS = False
+    print("* holoviews could not be import. heat_hv is not available.")
 
 FINAL_PARAMETERS = ['Metadata_Plate', 'Metadata_Well', 'plateColumn', 'plateRow',
                     "Compound_Id", 'Container_Id', "Well_Id", "Producer", "Pure_Flag", "Toxic",
@@ -504,6 +515,10 @@ class DataSet():
         """Counts the number of times each parameter has been active in the dataset."""
         return count_active_parameters_occurrences(self.data, act_prof=act_prof,
                                                    parameters=ACT_PROF_PARAMETERS)
+
+
+    def heat_mpl(self, id_prop="Compound_Id"):
+        heat_mpl(self.data, id_prop)
 
 
     @property
@@ -1390,3 +1405,50 @@ def count_active_parameters_occurrences(df, act_prof="Act_Profile", parameters=A
     for k, val in ctr_int.items():
         ctr_str[parameters[k]] = val
     return ctr_str
+
+
+def heat_mpl(df, id_prop="Compound_Id"):
+    plt.close()
+    df_len = len(df)
+    plt.style.use("seaborn-white")
+    plt.style.use("seaborn-pastel")
+    plt.style.use("seaborn-talk")
+    plt.rcParams['axes.labelsize'] = 25
+    # plt.rcParams['legend.fontsize'] = 20
+
+    plt.rcParams['figure.figsize'] = (12, 1.1 + 0.47 * (df_len - 1))
+    plt.rcParams['axes.labelsize'] = 25
+    plt.rcParams['ytick.labelsize'] = 20
+    plt.rcParams['xtick.labelsize'] = 15
+    fs_text = 18
+
+    y_labels = []
+    fp_list = []
+    for _, rec in df.iterrows():
+        y_labels.append(rec[id_prop])
+        fp = cpt.prof_to_list(rec["Act_Profile"])
+        fp_list.append(fp)
+
+    # invert y axis:
+    y_labels = y_labels[::-1]
+    fp_list = fp_list[::-1]
+    Z = np.asarray(fp_list)
+    plt.xticks([100, 186, 307])
+    plt.yticks(np.arange(df_len) + 0.5, y_labels)
+    plt.pcolor(Z, cmap="bwr")
+    plt.text(50, -1.1, "Cells", horizontalalignment='center', fontsize=fs_text)
+    plt.text(143, -1.1, "Cytoplasm", horizontalalignment='center', fontsize=fs_text)
+    plt.text(246, -1.1, "Nuclei", horizontalalignment='center', fontsize=fs_text)
+    plt.tight_layout()
+    plt.show()
+
+
+def heat_hv(df, id_prop="Compound_Id"):
+    df_len = len(df)
+    hm_opts = dict(width=870, height=40 + 25 * df_len, tools=['hover'], invert_yaxis=False,
+                   xrotation=90, labelled=[], toolbar='above', xaxis=None)
+    hm_style = {"cmap": "bwr"}
+    opts = {'HeatMap': {'plot': hm_opts, "style": hm_style}}
+    df_heat = cpt.melt(df, id_prop=id_prop)
+    heatmap = hv.HeatMap(df_heat)
+    return heatmap(opts)

@@ -157,3 +157,30 @@ def middle(lst, size):
     end = start + num_el
     mid_lst = mid_lst[start:end]
     return mid_lst
+
+
+def prof_to_list(act_prof):
+    return [int(x) for x in act_prof]
+
+
+def split_prof(df, id_prop):
+    """Split the Activity Profile into individual parameters."""
+    props = [id_prop, "Act_Profile"]
+    df_props = df[props]
+    result = []
+    for _, rec in df_props.iterrows():
+        ap = rec.pop("Act_Profile")
+        for i, v in enumerate(ap):
+            rec[ACT_PROF_PARAMETERS[i][7:]] = int(v)
+        result.append(rec)
+    return pd.DataFrame(result)
+
+
+def melt(df, id_prop="Compound_Id"):
+    """Taken and adapted from the Holoviews measles heatmap example."""
+    result = split_prof(df, id_prop)
+    result = pd.melt(result, id_vars=id_prop, var_name="Parameter", value_name="Value")
+    result = result.reset_index().drop("index", axis=1)
+    # result = result.sort_values([id_prop, "Parameter"]).reset_index().drop("index", axis=1)
+    result = result[["Parameter", id_prop, "Value"]]
+    return result
