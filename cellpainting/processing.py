@@ -466,6 +466,13 @@ class DataSet():
         return result
 
 
+    def id_filter(self, cpd_ids, id_col="Compound_Id", reset_index=True, sort_by_input=False):
+        result = self.new()
+        result.data = id_filter(self.data, cpd_ids, id_col=id_col, reset_index=reset_index,
+                                sort_by_input=sort_by_input)
+        return result
+
+
     def add_act_profile_for_control(self, parameters=ACT_PROF_PARAMETERS):
         # Compound_Id DMSO: 245754
         control = {"Compound_Id": 245754, "Trivial_Name": "Control", "Activity": 0,
@@ -1256,6 +1263,22 @@ def correlation_filter_std_old(df, cutoff=0.9, method="pearson"):
     parameters_uncorr = list(set(parameters_uncorr))
     # print("It took {} iterations to remove all correlated parameters.".format(iteration - 1))
     return df[parameters_uncorr], iteration
+
+
+def id_filter(df, cpd_ids, id_col="Compound_Id", reset_index=True, sort_by_input=False):
+    if not isinstance(cpd_ids, list):
+        cpd_ids = [cpd_ids]
+    result = df[df[id_col].isin(cpd_ids)]
+
+    if reset_index:
+        result.reset_index(inplace=True)
+        result.drop("index", axis=1, inplace=True)
+    if sort_by_input:
+        result["_sort"] = pd.Categorical(result[id_col], categories=cpd_ids, ordered=True)
+        result = result.sort_values("_sort")
+        result.drop("_sort", axis=1, inplace=False)
+    print_log(result, "id filter")
+    return result
 
 
 def find_similar(df, act_profile, cutoff=0.5, max_num=5,
